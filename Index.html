@@ -225,6 +225,9 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <div class="fg"><label>المقاطعة</label><input id="inp-district" placeholder="كانكوصة"></div>
       <div class="fg"><label>الولاية</label><input id="inp-region" placeholder="ولاية العصابة"></div>
     </div>
+    <div class="fr">
+      <div class="fg"><label>عبارة تظهر في الكشف الفردي (اختياري)</label><input id="inp-motto" placeholder="بالعلم ترتقي الأمم"></div>
+    </div>
     <button class="btn btn-green" onclick="saveSchool()">💾 حفظ ومزامنة</button>
   </div>
   <div class="card">
@@ -302,12 +305,17 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
 <div id="page-print" class="page">
   <div class="card">
     <div class="shdr"><div class="sh-t">🖨️ كشف الدرجات الرسمي</div></div>
-    <div class="etabs">
+    <div class="etabs" id="pr-types">
+      <div class="etab active" onclick="selPrType('card',this)">🧾 كشف فردي</div>
+      <div class="etab" onclick="selPrType('class',this)">📋 كشف القسم</div>
+    </div>
+    <div class="etabs" id="pr-exams">
       <div class="etab active" onclick="selPrExam(1,this)">الامتحان الأول</div>
       <div class="etab" onclick="selPrExam(2,this)">الامتحان الثاني</div>
       <div class="etab" onclick="selPrExam(3,this)">الامتحان الثالث</div>
     </div>
     <div class="ctabs" id="pr-ctabs"></div>
+    <div class="fg" id="pr-stu-wrap" style="margin-top:8px"><label>الطالب</label><select id="pr-stu"></select></div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-gold btn-full" onclick="openKashf()">👁️ معاينة وطباعة</button>
       <button class="btn btn-blue btn-full" onclick="downloadPDF()">⬇️ تحميل PDF</button>
@@ -558,7 +566,7 @@ function normalizeState(){
   if(S.auth===undefined)S.auth=null;
 }
 function refreshAll(){
-  renderStuTable();renderGrades();renderRanking();renderStaff();renderSchedule();updateStats();updateHdr();
+  renderStuTable();renderGrades();renderRanking();renderStaff();renderSchedule();fillPrStu();updateStats();updateHdr();
 }
 async function init(){
   document.getElementById('loading-overlay').classList.remove('hidden');
@@ -582,6 +590,7 @@ function renderSetup(){
   document.getElementById('inp-year').value=S.year;
   document.getElementById('inp-district').value=S.district||'';
   document.getElementById('inp-region').value=S.region||'';
+  document.getElementById('inp-motto').value=S.motto||'';
   let h='';
   for(let i=0;i<6;i++)
     h+=`<div class="fr" style="margin-bottom:6px">
@@ -596,6 +605,7 @@ function saveSchool(){
   S.year=document.getElementById('inp-year').value.trim();
   S.district=document.getElementById('inp-district').value.trim();
   S.region=document.getElementById('inp-region').value.trim();
+  S.motto=document.getElementById('inp-motto').value.trim();
   sv();updateHdr();
 }
 function saveClasses(){
@@ -610,7 +620,7 @@ function mkAllCtabs(){
   mk('stu-ctabs',i=>{curSC=i;renderStuTable();},curSC);
   mk('gr-ctabs', i=>{curGC=i;renderGrades();}, curGC);
   mk('rk-ctabs', i=>{curRkC=i;renderRanking();},curRkC);
-  mk('pr-ctabs', i=>{curPrC=i;},curPrC);
+  mk('pr-ctabs', i=>{curPrC=i;fillPrStu();},curPrC);
 }
 function mk(cid,cb,active){
   const el=document.getElementById(cid);
@@ -851,113 +861,221 @@ function renderRanking(){
   }).join('');
 }
 
+// ============ الكشف الفردي (النموذج) ============
+const BUL_CSS=`
+.bul{font-family:'Tajawal',sans-serif;direction:rtl;color:#000;background:#fff;width:100%;max-width:560px;margin:0 auto 18px;padding:14px;border:1px solid #ddd;font-size:12px;box-sizing:border-box}
+.bul *{box-sizing:border-box}
+.bul-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+.bul-side{flex:1;font-size:10px;font-weight:700;line-height:1.8}
+.bul-side.l{font-weight:600;text-align:left}
+.bul-logo{width:68px;height:68px;border-radius:50%;object-fit:cover;flex:none}
+.bul-exam{text-align:center;font-size:17px;font-weight:800;margin:10px 0 6px}
+.bul-banner{width:62%;margin:0 auto 12px;text-align:center;font-size:21px;font-weight:800;color:#1a3a2a;background:linear-gradient(#e3f4de,#c9e8c1);border:2px solid #9ccc9c;border-radius:12px;padding:8px 0;box-shadow:0 2px 0 #8bb88b}
+.bul-info{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:11.5px;font-weight:700;margin-bottom:8px}
+.bul-info b{color:#1d4ed8;font-weight:700}
+.bul table{width:100%;border-collapse:collapse;table-layout:fixed}
+.bul th,.bul td{border:1.5px solid #000;padding:6px 3px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700}
+.bul th{font-weight:800;background:#fff;color:#000;white-space:normal;line-height:1.35;font-size:11.5px}
+.bul td.sub{font-weight:700}
+.bul .v{font-size:14px;font-weight:800;direction:ltr;unicode-bidi:isolate}
+.bul .ok{color:#15803d}.bul .no{color:#dc2626}
+.bul .res{font-size:24px;font-weight:800}
+.bul .mot{font-size:11px;font-weight:700;line-height:1.9;padding:6px}
+.bul-sign{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;font-weight:800;min-height:56px}
+.bul-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.bul.bulc{max-width:none}
+.bul table.bul-cls{table-layout:fixed;min-width:760px}
+.bul-cls thead{display:table-header-group}.bul-cls tr{break-inside:avoid;page-break-inside:avoid}
+.bul .rt{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;margin:0 auto;height:104px;line-height:1.2}
+.bul table.bul-cls th,.bul table.bul-cls td{font-size:9.5px;padding:4px 1px;line-height:1.25}
+.bul table.bul-cls td.r{text-align:right;white-space:nowrap;padding-right:6px}
+.bul .bul-info b.ok{color:#15803d}.bul .bul-info b.no{color:#dc2626}
+.bul table.bul-cls td.ok{color:#15803d}.bul table.bul-cls td.no{color:#dc2626}
+@media print{.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{border:none;margin:0 auto;padding:0;max-width:none;break-after:page;page-break-after:always}.bul:last-child{break-after:auto;page-break-after:auto}@page{size:A4;margin:10mm}}
+`;
+(function(){try{if(document.head&&document.createElement){const st=document.createElement('style');st.textContent=BUL_CSS;document.head.appendChild(st);}}catch(e){}})();
+
+let prType='card';
+function selPrType(t,el){
+  prType=t;
+  document.querySelectorAll('#pr-types .etab').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  $('pr-stu-wrap').style.display=t==='card'?'':'none';
+}
+function fillPrStu(){
+  const sel=$('pr-stu');if(!sel)return;
+  const old=sel.value;
+  const stus=getStuByClass(curPrC);
+  sel.innerHTML=`<option value="all">كل طلاب القسم (${stus.length})</option>`+stus.map(s=>`<option value="${s.id}">${esc(s.callNum||'—')} — ${esc(s.name)}</option>`).join('');
+  if(old&&[...stus.map(s=>String(s.id)),'all'].includes(old))sel.value=old;
+}
+function hasGr(id,ex){
+  const g=((S.grades||{})[id]||{})[ex]||{};
+  return Object.keys(g).some(k=>k!=='_absent'&&g[k]!==undefined&&g[k]!==''&&g[k]!==null);
+}
+function buildPrint(){
+  return prType==='class'?buildKashf(curPrC,curPrEx):buildBulletins(curPrC,curPrEx,$('pr-stu').value);
+}
+function buildBulletins(ci,exam,which){
+  const all=getStuByClass(ci);
+  if(!all.length)return '<div class="empty">لا يوجد طلاب في هذا القسم</div>';
+  const fin=s=>parseFloat(exam===3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci));
+  const rankOf=s=>1+all.filter(o=>fin(o)>fin(s)).length;
+  const list=which&&which!=='all'?all.filter(s=>String(s.id)===String(which)):all;
+  return list.map(s=>buildBulletin(s,ci,exam,rankOf(s))).join('');
+}
+function buildBulletin(stu,ci,exam,rank){
+  const subs=getSubs(ci),n=subs.length,mt=maxTotal(ci);
+  const g=((S.grades||{})[stu.id]||{})[exam]||{};
+  const f2=v=>parseFloat(v).toFixed(2).replace('.',',');
+  const has=hasGr(stu.id,exam);
+  const avg=parseFloat(calcAvg(stu.id,exam,ci));
+  const final=exam===3?parseFloat(calcYearAvg(stu.id,ci)):avg;
+  const pass=final>=10;
+  const absent=((S.grades||{})[stu.id]||{})[exam]?.['_absent'];
+  const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':'امتحان الفصل الأخير';
+  const cls=v=>v>=10?'ok':'no';
+  const exAvg=e=>{
+    if(!hasGr(stu.id,e))return '<span class="v">—</span>';
+    const a=parseFloat(calcAvg(stu.id,e,ci));
+    return `<span class="v ${cls(a)}">${f2(a)}\\20</span>`;
+  };
+  // توزيع كتل معدلات الامتحانات بحسب عدد المواد
+  const base=Math.floor(n/3),rem=n%3;
+  const sz=[base+(rem>0?1:0),base+(rem>1?1:0),base];
+  const r2=sz[0]+1,r3=sz[0]+sz[1]+2;
+  const bodyRows=n+2;
+  const motto=esc(S.motto||'بالعلم ترتقي الأمم');
+  let rows='';
+  for(let r=0;r<=bodyRows;r++){
+    let c1='',c2='';
+    if(r===0){c1='<th>المواد</th>';c2='<th>الدرجات</th>';}
+    else if(r<=n){
+      const sb=subs[r-1];const v=g[sb.name];
+      c1=`<td class="sub">${esc(sb.name)}</td>`;
+      c2=`<td><span class="v">${v!==undefined&&v!==''?esc(v)+'\\'+sb.coeff[ci]:'—'}</span></td>`;
+    }else if(r===n+1){
+      c1='<td class="sub">المجموع</td>';
+      c2=`<td><span class="v">${has?calcTotal(stu.id,exam,ci)+'\\'+mt:'—'}</span></td>`;
+    }else{
+      c1='<td class="sub">المعدل</td>';
+      c2=`<td><span class="v ${has?cls(avg):''}">${has?f2(avg)+'\\20':'—'}</span></td>`;
+    }
+    let c3='',c4='';
+    if(r===0)c3='<th>معدل الامتحان الأول</th>';
+    else if(r===1)c3=`<td rowspan="${sz[0]}">${exAvg(1)}</td>`;
+    else if(r===r2)c3='<th>معدل الامتحان الثاني</th>';
+    else if(r===r2+1)c3=`<td rowspan="${sz[1]}">${exAvg(2)}</td>`;
+    else if(r===r3)c3='<th>معدل الامتحان الثالث</th>';
+    else if(r===r3+1)c3=`<td rowspan="${sz[2]}">${exAvg(3)}</td>`;
+    if(r===0)c4=`<td rowspan="${sz[0]+1}" class="mot">${motto}</td>`;
+    else if(r===r2)c4='<th>الملاحظات</th>';
+    else if(r===r2+1)c4=`<td rowspan="${bodyRows-r2}"><div class="res ${has?(pass?'ok':'no'):''}">${has?(pass?'ناجح':'راسب'):'—'}</div>${absent?`<div style="font-size:11px;margin-top:8px">الغياب: ${esc(absent)}</div>`:''}</td>`;
+    rows+=`<tr>${c1}${c2}${c3}${c4}</tr>`;
+  }
+  return `<div class="bul">
+    ${bulHeader(ci,examTitle)}
+    <div class="bul-info">
+      <div>الاسم الكامل: <b>${esc(stu.name)}</b></div>
+      <div>الرقم المدرسي: <b>${esc(stu.schoolNum||'—')}</b></div>
+      <div>رقم النداء: <b>${esc(stu.callNum||'—')}</b></div>
+    </div>
+    <table>
+      <colgroup><col style="width:27%"><col style="width:18%"><col style="width:24%"><col style="width:31%"></colgroup>
+      ${rows}
+      <tr><td colspan="2" style="font-size:13px">المعدل العام: <span class="v ${has?cls(final):''}">${has?f2(final):'—'}</span></td><td colspan="2" style="font-size:13px">الرتبة: <span class="v ${has?cls(final):''}">${has?rank:'—'}</span></td></tr>
+    </table>
+    <div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>
+  </div>`;
+}
+
 // ============ KASHF - الكشف الرسمي العمودي ============
-function selPrExam(n,el){curPrEx=n;document.querySelectorAll('#page-print .etab').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+function selPrExam(n,el){curPrEx=n;document.querySelectorAll('#pr-exams .etab').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
+
+function bulHeader(ci,examTitle){
+  const region=S.region?(S.region.startsWith('ولاية')?'ب'+S.region:'بولاية '+S.region):'';
+  const dist=S.district?(S.district.startsWith('مقاطعة')?S.district:'مقاطعة '+S.district):'';
+  return `<div class="bul-top">
+      <div class="bul-side">
+        <div>الجمهورية الإسلامية الموريتانية</div>
+        <div>وزارة التربية وإصلاح النظام التعليمي</div>
+        ${region?`<div>الإدارة الجهوية ${esc(region)}</div>`:''}
+        ${dist?`<div>مفتشية التعليم ب${esc(dist)}</div>`:''}
+      </div>
+      <img class="bul-logo" src="${LOGO_B64}">
+      <div class="bul-side l">
+        <div>شرف – إخاء – عدل</div>
+        <div>العام الدراسي: ${esc(S.year||'———')}</div>
+        <div>المدرسة: ${esc(S.school||'———')}</div>
+        <div>القسم: ${esc(S.classes[ci])}</div>
+      </div>
+    </div>
+    <div class="bul-exam">${examTitle}</div>
+    <div class="bul-banner">كشف الدرجات</div>`;
+}
 
 function buildKashf(ci,exam){
-  const subs=getSubs(ci);
-  const isE3=exam===3;
-  const stus=getStuByClass(ci).sort((a,b)=>{
-    const aa=isE3?calcYearAvg(a.id,ci):calcAvg(a.id,exam,ci);
-    const bb=isE3?calcYearAvg(b.id,ci):calcAvg(b.id,exam,ci);
-    return parseFloat(bb)-parseFloat(aa);
-  });
-  const examLbl=exam===1?'الأول':exam===2?'الثاني':'الثالث (الأخير)';
-  const total_s=stus.length;
-  const pass_s=stus.filter(s=>parseFloat(isE3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci))>=10).length;
-  const mt=maxTotal(ci);
-
-  // بناء الجدول العمودي - المواد في الأعمدة، الطلاب في الصفوف
-  let subHeaders=subs.map(s=>`<th>${s.name}<br>/${s.coeff[ci]}</th>`).join('');
-  let examCols=isE3?`<th>م.ف١<br>/20</th><th>م.ف٢<br>/20</th><th>م.ف٣<br>/20</th><th>المعدل السنوي<br>/20</th>`:'';
-
-  let rows=stus.map((stu,i)=>{
-    const g=((S.grades||{})[stu.id]||{})[exam]||{};
-    const absent=((S.grades||{})[stu.id]||{})[exam]?.['_absent']||'—';
-    const grades=subs.map(s=>`<td>${g[s.name]!==undefined?g[s.name]:'—'}</td>`).join('');
-    const tot=calcTotal(stu.id,exam,ci);
-    const avg=calcAvg(stu.id,exam,ci);
-    const finalAvg=isE3?calcYearAvg(stu.id,ci):avg;
-    const pass=parseFloat(finalAvg)>=10;
-    let extra='';
-    if(isE3){
-      const a1=calcAvg(stu.id,1,ci),a2=calcAvg(stu.id,2,ci),a3=calcAvg(stu.id,3,ci);
-      const yr=calcYearAvg(stu.id,ci);
-      extra=`<td class="avg-td">${a1}</td><td class="avg-td">${a2}</td><td class="avg-td">${a3}</td>
-             <td class="${parseFloat(yr)>=10?'year-td':'avg-td'}" style="${parseFloat(yr)<10?'background:#fee2e2;color:#991b1b;font-weight:800':''}">${yr}</td>`;
-    }
-    return`<tr>
-      <td style="font-weight:800">${i+1}</td>
-      <td>${stu.callNum||'—'}</td>
-      <td class="r" style="font-weight:700;white-space:nowrap">${stu.name}</td>
-      <td>${stu.schoolNum||'—'}</td>
-      ${grades}
-      <td class="total-td">${tot}/${mt}</td>
-      <td class="avg-td ${grCls(avg)}">${avg}</td>
-      ${extra}
-      <td>${absent}</td>
-      <td style="font-weight:800;color:${pass?'#006233':'#dc2626'}">${pass?'ناجح ✓':'راسب ✗'}</td>
+  const subs=getSubs(ci),mt=maxTotal(ci),isE3=exam===3;
+  const stus=getStuByClass(ci);
+  const f2=v=>parseFloat(v).toFixed(2).replace('.',',');
+  const cls=v=>v>=10?'ok':'no';
+  const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':'امتحان الفصل الأخير';
+  const data=stus.map(s=>({s,has:hasGr(s.id,exam),fin:parseFloat(isE3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci))}));
+  data.forEach(d=>{d.rank=1+data.filter(o=>o.fin>d.fin).length;});
+  data.sort((a,b)=>a.rank-b.rank||parseFloat(a.s.callNum||0)-parseFloat(b.s.callNum||0));
+  const total=data.length,pass=data.filter(d=>d.has&&d.fin>=10).length;
+  const rt=t=>`<th><div class="rt">${t}</div></th>`;
+  const fx=isE3?{rank:4,call:4,name:17,snum:6,tot:5,avg:5,ex:5,yr:5,abs:4,res:6}:{rank:5,call:5,name:21,snum:7,tot:6,avg:6,abs:5,res:7};
+  const used=fx.rank+fx.call+fx.name+fx.snum+fx.tot+fx.avg+(isE3?3*fx.ex+fx.yr:0)+fx.abs+fx.res;
+  const sw=((100-used)/subs.length).toFixed(2);
+  const col=w=>`<col style="width:${w}%">`;
+  const cols=col(fx.rank)+col(fx.call)+col(fx.name)+col(fx.snum)+subs.map(()=>col(sw)).join('')+col(fx.tot)+col(fx.avg)+(isE3?col(fx.ex)+col(fx.ex)+col(fx.ex)+col(fx.yr):'')+col(fx.abs)+col(fx.res);
+  const head=`<tr>${rt('الرتبة')}${rt('رقم النداء')}<th>الاسم الكامل</th>${rt('الرقم المدرسي')}
+    ${subs.map(sb=>rt(esc(sb.name)+' / '+sb.coeff[ci])).join('')}
+    ${rt('المجموع / '+mt)}${rt('المعدل / 20')}
+    ${isE3?rt('معدل ف١')+rt('معدل ف٢')+rt('معدل ف٣')+rt('المعدل العام'):''}
+    ${rt('الغياب')}${rt('النتيجة')}</tr>`;
+  const rows=data.map(d=>{
+    const s=d.s,g=((S.grades||{})[s.id]||{})[exam]||{};
+    const absent=((S.grades||{})[s.id]||{})[exam]?.['_absent'];
+    const avg=parseFloat(calcAvg(s.id,exam,ci));
+    const exA=e=>hasGr(s.id,e)?`<span class="v ${cls(parseFloat(calcAvg(s.id,e,ci)))}">${f2(calcAvg(s.id,e,ci))}</span>`:'—';
+    return `<tr>
+      <td>${d.has?`<span class="v">${d.rank}</span>`:'—'}</td>
+      <td>${esc(s.callNum||'—')}</td>
+      <td class="r">${esc(s.name)}</td>
+      <td>${esc(s.schoolNum||'—')}</td>
+      ${subs.map(sb=>`<td>${g[sb.name]!==undefined&&g[sb.name]!==''?esc(g[sb.name]):'—'}</td>`).join('')}
+      <td>${d.has?`<span class="v">${calcTotal(s.id,exam,ci)}</span>`:'—'}</td>
+      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>
+      ${isE3?`<td>${exA(1)}</td><td>${exA(2)}</td><td>${exA(3)}</td><td>${d.has?`<span class="v ${cls(d.fin)}">${f2(d.fin)}</span>`:'—'}</td>`:''}
+      <td>${absent?esc(absent):'—'}</td>
+      <td class="${d.has?(d.fin>=10?'ok':'no'):''}" style="font-weight:800">${d.has?(d.fin>=10?'ناجح':'راسب'):'—'}</td>
     </tr>`;
   }).join('');
-
-  return`<div class="kashf">
-  <div class="kashf-header">
-    <img src="${LOGO_B64}" class="kashf-logo">
-    <div class="kashf-center">
-      <div class="kashf-country">الجمهورية الإسلامية الموريتانية</div>
-      <div class="kashf-ministry">وزارة التربية وإصلاح النظام التعليمي</div>
-      ${S.region?`<div style="font-size:11px;color:#444;margin-top:2px">${S.region}${S.district?' — '+S.district:''}</div>`:''}
-      <div class="kashf-school">${S.school||'اسم المدرسة'}</div>
+  return `<div class="bul bulc">
+    ${bulHeader(ci,examTitle)}
+    <div class="bul-info">
+      <div>عدد الطلاب: <b>${total}</b></div>
+      <div>الناجحون: <b class="ok">${pass}</b></div>
+      <div>الراسبون: <b class="no">${data.filter(d=>d.has&&d.fin<10).length}</b></div>
+      <div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>
     </div>
-    <img src="${LOGO_B64}" class="kashf-logo">
-  </div>
-  <div class="kashf-meta">
-    <div class="kashf-meta-item"><div class="kashf-meta-label">السنة الدراسية</div><div class="kashf-meta-value">${S.year||'———'}</div></div>
-    <div class="kashf-meta-item"><div class="kashf-meta-label">القسم</div><div class="kashf-meta-value">${S.classes[ci]}</div></div>
-    <div class="kashf-meta-item"><div class="kashf-meta-label">المجموع الكلي</div><div class="kashf-meta-value">/${mt}</div></div>
-    <div class="kashf-meta-item"><div class="kashf-meta-label">عدد الطلاب</div><div class="kashf-meta-value">${total_s}</div></div>
-    <div class="kashf-meta-item"><div class="kashf-meta-label">الناجحون</div><div class="kashf-meta-value" style="color:#006233">${pass_s}</div></div>
-    <div class="kashf-meta-item"><div class="kashf-meta-label">الراسبون</div><div class="kashf-meta-value" style="color:#dc2626">${total_s-pass_s}</div></div>
-    <div class="kashf-meta-item"><div class="kashf-meta-label">نسبة النجاح</div><div class="kashf-meta-value">${total_s?Math.round(pass_s/total_s*100):0}%</div></div>
-  </div>
-  <div class="kashf-title">كشف درجات امتحان الفصل ${examLbl}</div>
-  <div style="overflow-x:auto">
-  <table>
-    <thead>
-      <tr>
-        <th>الرتبة</th>
-        <th>رقم النداء</th>
-        <th class="r">الاسم الكامل</th>
-        <th>الرقم المدرسي</th>
-        ${subHeaders}
-        <th>المجموع</th>
-        <th>المعدل</th>
-        ${examCols}
-        <th>الغياب</th>
-        <th>النتيجة</th>
-      </tr>
-    </thead>
-    <tbody>${rows||'<tr><td colspan="20" style="text-align:center;padding:20px">لا يوجد طلاب</td></tr>'}</tbody>
-  </table>
-  </div>
-  ${isE3?'<div style="font-size:9px;color:#666;margin-top:6px;text-align:right">* المعدل السنوي = (م.ف١ + م.ف٢ + م.ف٣) ÷ 3 &nbsp;|&nbsp; المعدل = المجموع ÷ 10</div>':'<div style="font-size:9px;color:#666;margin-top:6px;text-align:right">* المعدل = المجموع ÷ 10</div>'}
-  <div class="kashf-footer">
-    <div class="kashf-sign"><div>المعلم / المعلمة</div><div class="kashf-sign-line"></div></div>
-    <div class="kashf-sign"><div>المدير</div><div class="kashf-sign-line"></div></div>
-    <div class="kashf-sign"><div>الختم الرسمي</div><div class="kashf-sign-line"></div></div>
-  </div>
+    <div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup><thead>${head}</thead><tbody>${rows||`<tr><td colspan="${subs.length+8}">لا يوجد طلاب</td></tr>`}</tbody></table></div>
+    <div style="font-size:10px;margin-top:6px">* المعدل = المجموع ÷ 10${isE3?' ، المعدل العام = (معدل ف١ + ف٢ + ف٣) ÷ 3':''}</div>
+    <div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>
   </div>`;
 }
 
 function openKashf(){
-  document.getElementById('kashf-content').innerHTML=buildKashf(curPrC,curPrEx);
+  document.getElementById('kashf-content').innerHTML=buildPrint();
   document.getElementById('print-overlay').style.display='block';
   window.scrollTo(0,0);
 }
 function closeKashf(){document.getElementById('print-overlay').style.display='none';}
 
 function downloadPDF(){
-  const kashfHTML=buildKashf(curPrC,curPrEx);
+  const kashfHTML=buildPrint();
   const examLbl=curPrEx===1?'الاول':curPrEx===2?'الثاني':'الثالث';
   const cls=S.classes[curPrC].replace(/ /g,'_');
   const full=`<!DOCTYPE html><html lang="ar" dir="rtl"><head>
@@ -990,6 +1108,7 @@ function downloadPDF(){
       .kashf-sign-line{margin-top:16px;border-top:1px solid #333;width:80px;margin-left:auto;margin-right:auto}
       .gg{color:#006233;font-weight:800}.gok{color:#1d4ed8;font-weight:700}
       .gw{color:#ea580c;font-weight:700}.gf{color:#dc2626;font-weight:700}
+      ${BUL_CSS}
     </style>
   </head><body>${kashfHTML}</body></html>`;
   const blob=new Blob([full],{type:'text/html;charset=utf-8'});
