@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>منصة مدرستي- موريتانيا</title>
+<title>منصة النتائج المدرسية - موريتانيا</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 :root{
@@ -315,12 +315,12 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
   <div class="card">
     <div class="shdr">
       <div class="sh-t">👥 قائمة الطلاب</div>
-      <button class="btn btn-green btn-sm admin-only" onclick="openModal('modal-student')">+ إضافة</button>
+      <button class="btn btn-green btn-sm" onclick="addStuClick()">+ إضافة</button>
     </div>
     <div class="ctabs" id="stu-ctabs"></div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>رقم النداء</th><th class="r">الاسم الكامل</th><th>الرقم المدرسي</th><th>الجنس</th><th class="admin-only">حذف</th></tr></thead>
+        <thead><tr><th>رقم النداء</th><th class="r">الاسم الكامل</th><th>الرقم المدرسي</th><th>الجنس</th><th>تعديل</th><th class="admin-only">حذف</th></tr></thead>
         <tbody id="stu-tbody"></tbody>
       </table>
     </div>
@@ -509,7 +509,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
 
 <div class="modal-bg" id="modal-student">
   <div class="modal">
-    <h3>➕ إضافة طالب</h3>
+    <h3 id="m-stu-title">➕ إضافة طالب</h3>
     <div class="fr">
       <div class="fg" style="max-width:80px"><label>رقم النداء</label><input id="m-callnum" type="number" placeholder="1"></div>
       <div class="fg"><label>الاسم الكامل</label><input id="m-name" placeholder="الاسم الكامل"></div>
@@ -521,7 +521,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     <div class="fr"><div class="fg"><label>القسم</label><select id="m-class"></select></div></div>
     <div class="modal-footer">
       <button class="btn btn-green" style="flex:1" onclick="saveStu()">✅ حفظ</button>
-      <button class="btn" style="flex:1;background:#f3f4f6" onclick="closeModal('modal-student')">إلغاء</button>
+      <button class="btn" style="flex:1;background:#f3f4f6" onclick="editingStu=null;closeModal('modal-student')">إلغاء</button>
     </div>
   </div>
 </div>
@@ -621,9 +621,9 @@ let saveTimer=null;
 
 // ============ JSONBIN SYNC (دمج آمن لعدة مستخدمين) ============
 const ADMIN_KEYS=['school','year','district','region','regLine','distLine','motto','classes','staff','students','auth','schedule','satt'];
-function newDirty(){return {admin:false,g:{},att:{},login:{},loginSet:{}};}
+function newDirty(){return {admin:false,g:{},att:{},login:{},loginSet:{},stu:{}};}
 let dirty=newDirty(),saving=false,againSave=false;
-function hasDirty(d){return d.admin||Object.keys(d.g).length>0||Object.keys(d.att).length>0||Object.keys(d.login).length>0;}
+function hasDirty(d){return d.admin||Object.keys(d.g).length>0||Object.keys(d.att).length>0||Object.keys(d.login).length>0||Object.keys(d.stu).length>0;}
 function markG(id,ex,key,val){const a=dirty.g[id]||(dirty.g[id]={});const b=a[ex]||(a[ex]={});b[key]=val;}
 function markAtt(ci,date,sid,val){const a=dirty.att[ci]||(dirty.att[ci]={});const b=a[date]||(a[date]={});b[sid]=val;}
 function mergeDirty(into,from){
@@ -632,6 +632,7 @@ function mergeDirty(into,from){
     const a=into.g[id]||(into.g[id]={});const b=a[ex]||(a[ex]={});if(!(k in b))b[k]=from.g[id][ex][k];})));
   Object.keys(from.att).forEach(ci=>Object.keys(from.att[ci]).forEach(dt=>Object.keys(from.att[ci][dt]).forEach(k=>{
     const a=into.att[ci]||(into.att[ci]={});const b=a[dt]||(a[dt]={});if(!(k in b))b[k]=from.att[ci][dt][k];})));
+  Object.keys(from.stu||{}).forEach(id=>{if(!(id in into.stu))into.stu[id]=from.stu[id];});
   Object.keys(from.login).forEach(id=>{if(!(id in into.login))into.login[id]=from.login[id];});
   Object.keys(from.loginSet).forEach(id=>{into.loginSet[id]=true;});
 }
@@ -653,6 +654,15 @@ function applyDirty(t,d){
       if(v)day[sid]=v;else delete day[sid];
     });
   }));
+  if(d.stu&&Object.keys(d.stu).length){
+    if(!t.students)t.students=[];
+    Object.keys(d.stu).forEach(id=>{
+      const v=d.stu[id];
+      const i=t.students.findIndex(x=>String(x.id)===String(id));
+      if(v===null){if(i>=0)t.students.splice(i,1);}
+      else if(i>=0)t.students[i]=v;else t.students.push(v);
+    });
+  }
   if(t.staff)Object.keys(d.login).forEach(id=>{
     const st=t.staff.find(x=>String(x.id)===String(id));
     if(st){if(d.login[id])st.login=d.login[id];else delete st.login;}
@@ -690,7 +700,7 @@ async function saveToCloud(){
     const out=(remote&&typeof remote==='object')?remote:{};
     if(d.admin){
       const rl={};(out.staff||[]).forEach(s=>{rl[s.id]=s.login;});
-      ADMIN_KEYS.forEach(k=>{if(S[k]!==undefined)out[k]=JSON.parse(JSON.stringify(S[k]));});
+      ADMIN_KEYS.forEach(k=>{if(k!=='students'&&S[k]!==undefined)out[k]=JSON.parse(JSON.stringify(S[k]));});
       (out.staff||[]).forEach(s=>{
         if(!d.loginSet[s.id]){if(rl[s.id])s.login=rl[s.id];else delete s.login;}
       });
@@ -725,9 +735,9 @@ function setSyncStatus(status){
   else if(status==='err'){el.className='sync-indicator sync-err';el.textContent='⚠️ غير متزامن';}
   else{el.className='sync-indicator sync-loading';el.textContent='⏳ جاري المزامنة...';}
 }
-function sv(){
+function sv(noAdmin){
   if(role==='none')return;
-  if(isAdmin)dirty.admin=true;
+  if(isAdmin&&!noAdmin)dirty.admin=true;
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>saveToCloud(),1500);
 }
@@ -834,11 +844,23 @@ function mk(cid,cb,active){
 // ============ MODALS ============
 function openModal(id){
   if(id==='modal-student'){
-    document.getElementById('m-class').innerHTML=S.classes.map((c,i)=>`<option value="${i}">${esc(c)}</option>`).join('');
+    if(!editingStu)document.getElementById('m-stu-title').textContent='➕ إضافة طالب';
+    document.getElementById('m-class').innerHTML=S.classes.map((c,i)=>canEdit(i)?`<option value="${i}">${esc(c)}</option>`:'').join('');
     document.getElementById('m-class').value=curSC;
-    document.getElementById('m-name').value='';
-    document.getElementById('m-callnum').value='';
-    document.getElementById('m-schoolnum').value='';
+    if(editingStu){
+      const s=(S.students||[]).find(x=>x.id===editingStu);
+      if(s){
+        document.getElementById('m-class').value=s.classIdx;
+        document.getElementById('m-name').value=s.name||'';
+        document.getElementById('m-callnum').value=s.callNum||'';
+        document.getElementById('m-schoolnum').value=s.schoolNum||'';
+        document.getElementById('m-gender').value=s.gender||'ذكر';
+      }
+    }else{
+      document.getElementById('m-name').value='';
+      document.getElementById('m-callnum').value='';
+      document.getElementById('m-schoolnum').value='';
+    }
   }
   if(id==='modal-days'){
     document.getElementById('days-checks').innerHTML=DAYS.map((d,i)=>`<label class="chk"><input type="checkbox" value="${i}" ${S.schedule.workDays.includes(i)?'checked':''}> ${d}</label>`).join('');
@@ -980,40 +1002,62 @@ function renderStaff(){
 }
 
 // ============ STUDENTS ============
+function addStuClick(){
+  if(!canEdit(curSC)){showToast('⚠️ يمكنك الإضافة في الأقسام المسندة إليك فقط');return;}
+  editingStu=null;openModal('modal-student');
+}
 function saveStu(){
-  if(!isAdmin)return;
   const name=document.getElementById('m-name').value.trim();
   if(!name){showToast('⚠️ أدخل الاسم');return;}
   if(!S.students)S.students=[];
-  S.students.push({
-    id:Date.now(),
+  const ci=parseInt(document.getElementById('m-class').value);
+  if(!canEdit(ci)){showToast('⚠️ هذا القسم غير مسند إليك');return;}
+  const data={
     callNum:document.getElementById('m-callnum').value.trim(),
     name,schoolNum:document.getElementById('m-schoolnum').value.trim(),
     gender:document.getElementById('m-gender').value,
-    classIdx:parseInt(document.getElementById('m-class').value)
-  });
-  // update curSC to match the class we just added to
-  curSC=parseInt(document.getElementById('m-class').value);
-  sv();closeModal('modal-student');
+    classIdx:ci
+  };
+  const wasEdit=!!editingStu;
+  let rec;
+  if(wasEdit){
+    const s=S.students.find(x=>x.id===editingStu);
+    if(!s||!canEdit(s.classIdx)){editingStu=null;showToast('⚠️ لا تملك صلاحية تعديل هذا التلميذ');return;}
+    Object.assign(s,data);rec=s;
+    editingStu=null;
+  }else{rec=Object.assign({id:Date.now()},data);S.students.push(rec);}
+  dirty.stu[rec.id]=JSON.parse(JSON.stringify(rec));
+  curSC=ci;
+  sv(true);closeModal('modal-student');
   mkAllCtabs();
   setTimeout(()=>{renderStuTable();updateStats();},50);
-  showToast('✅ تمت الإضافة');
+  showToast(wasEdit?'✅ تم حفظ التعديل':'✅ تمت الإضافة');
+}
+let editingStu=null;
+function editStu(id){
+  const s=(S.students||[]).find(x=>x.id===id);
+  if(!s||!canEdit(s.classIdx))return;
+  editingStu=id;
+  document.getElementById('m-stu-title').textContent='✏️ تعديل بيانات الطالب';
+  openModal('modal-student');
 }
 function deleteStu(id){
   if(!isAdmin)return;
   if(!confirm('حذف الطالب؟'))return;
   S.students=S.students.filter(x=>x.id!==id);
   if(S.grades)delete S.grades[id];
-  sv();renderStuTable();updateStats();
+  dirty.stu[id]=null;
+  sv(true);renderStuTable();updateStats();
 }
 function getStuByClass(ci){return (S.students||[]).filter(s=>s.classIdx===ci).sort((a,b)=>parseInt(a.callNum||0)-parseInt(b.callNum||0));}
 function renderStuTable(){
   const list=getStuByClass(curSC);
   const tb=document.getElementById('stu-tbody');
-  if(!list.length){tb.innerHTML=`<tr><td colspan="5" class="empty">لا يوجد طلاب</td></tr>`;return;}
+  if(!list.length){tb.innerHTML=`<tr><td colspan="6" class="empty">لا يوجد طلاب</td></tr>`;return;}
   tb.innerHTML=list.map(s=>`<tr>
     <td>${s.callNum||'—'}</td><td class="r">${s.name}</td>
     <td>${s.schoolNum||'—'}</td><td>${s.gender}</td>
+    <td>${canEdit(s.classIdx)?`<button class="btn btn-blue btn-sm" onclick="editStu(${s.id})">✏️</button>`:'—'}</td>
     <td class="admin-only"><button class="btn btn-red btn-sm" onclick="deleteStu(${s.id})">🗑️</button></td>
   </tr>`).join('');
 }
@@ -1159,7 +1203,7 @@ const BUL_CSS=`
 .bul table.bul-cls td.r{text-align:right;white-space:nowrap;padding-right:6px}
 .bul .bul-info b.ok{color:#15803d}.bul .bul-info b.no{color:#dc2626}
 .bul table.bul-cls td.ok{color:#15803d}.bul table.bul-cls td.no{color:#dc2626}
-@media print{.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{border:none;margin:0 auto;padding:0;max-width:none;break-after:page;page-break-after:always}.bul:last-child{break-after:auto;page-break-after:auto}@page{size:A4;margin:10mm}}
+@media print{.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{border:none;margin:0 auto;padding:0;max-width:none;break-after:auto;page-break-after:auto}.bul.bulc{break-after:page;page-break-after:always}.bul.bulc:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc){height:136mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid;border-bottom:1px dashed #999;padding-bottom:2mm}.bul.pgend{break-after:page;page-break-after:always;border-bottom:none}.bul.pgend:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc) .bul-side{font-size:9px;line-height:1.5}.bul:not(.bulc) .bul-logo{width:52px;height:52px}.bul:not(.bulc) .bul-exam{font-size:14px;margin:3px 0}.bul:not(.bulc) .bul-banner{font-size:16px;padding:3px 0;margin-bottom:5px}.bul:not(.bulc) .bul-info{margin-bottom:4px;font-size:10.5px}.bul:not(.bulc) th,.bul:not(.bulc) td{padding:2px 3px;font-size:11px}.bul:not(.bulc) .v{font-size:12px}.bul:not(.bulc) .res{font-size:18px}.bul:not(.bulc) .bul-sign{min-height:24px;margin-top:4px}@page{size:A4;margin:10mm}}
 `;
 (function(){try{if(document.head&&document.createElement){const st=document.createElement('style');st.textContent=BUL_CSS;document.head.appendChild(st);}}catch(e){}})();
 
@@ -1190,9 +1234,9 @@ function buildBulletins(ci,exam,which){
   const fin=s=>parseFloat(exam===3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci));
   const rankOf=s=>1+all.filter(o=>fin(o)>fin(s)).length;
   const list=which&&which!=='all'?all.filter(s=>String(s.id)===String(which)):all.slice().sort((a,b)=>rankOf(a)-rankOf(b)||parseFloat(a.callNum||0)-parseFloat(b.callNum||0));
-  return list.map(s=>buildBulletin(s,ci,exam,rankOf(s))).join('');
+  return list.map((s,i)=>buildBulletin(s,ci,exam,rankOf(s),i%2===1||i===list.length-1)).join('');
 }
-function buildBulletin(stu,ci,exam,rank){
+function buildBulletin(stu,ci,exam,rank,pgend){
   const subs=getSubs(ci),n=subs.length,mt=maxTotal(ci);
   const g=((S.grades||{})[stu.id]||{})[exam]||{};
   const f2=v=>parseFloat(v).toFixed(2).replace('.',',');
@@ -1242,15 +1286,13 @@ function buildBulletin(stu,ci,exam,rank){
       else if(r===r2)c4='<th>الملاحظات</th>';
       else if(r===r2+1)c4=`<td rowspan="${bodyRows-r2}">${remark}</td>`;
     }else{
-      if(r===0)c3=`<th>معدل الامتحان ${exam===1?'الأول':'الثاني'}</th>`;
-      else if(r===1)c3=`<td rowspan="${bodyRows}">${has?`<span class="v ${cls(avg)}">${f2(avg)}\\20</span>`:'<span class="v">—</span>'}</td>`;
       if(r===0)c4=`<td rowspan="4" class="mot">${motto}</td>`;
       else if(r===4)c4='<th>الملاحظات</th>';
       else if(r===5)c4=`<td rowspan="${bodyRows-4}">${remark}</td>`;
     }
     rows+=`<tr>${c1}${c2}${c3}${c4}</tr>`;
   }
-  return `<div class="bul">
+  return `<div class="bul${pgend?' pgend':''}">
     ${bulHeader(ci,examTitle)}
     <div class="bul-info">
       <div>الاسم الكامل: <b>${esc(stu.name)}</b></div>
@@ -1258,9 +1300,9 @@ function buildBulletin(stu,ci,exam,rank){
       <div>رقم النداء: <b>${esc(stu.callNum||'—')}</b></div>
     </div>
     <table>
-      <colgroup><col style="width:27%"><col style="width:18%"><col style="width:24%"><col style="width:31%"></colgroup>
+      <colgroup>${isE3?'<col style="width:27%"><col style="width:18%"><col style="width:24%"><col style="width:31%">':'<col style="width:34%"><col style="width:24%"><col style="width:42%">'}</colgroup>
       ${rows}
-      <tr><td colspan="2" style="font-size:13px">${isE3?'المعدل العام':'معدل الامتحان'}: <span class="v ${has?cls(final):''}">${has?f2(final):'—'}</span></td><td colspan="2" style="font-size:13px">الرتبة: <span class="v ${has?cls(final):''}">${has?rank:'—'}</span></td></tr>
+      <tr>${isE3?`<td colspan="2" style="font-size:13px">المعدل العام: <span class="v ${has?cls(final):''}">${has?f2(final):'—'}</span></td>`:''}<td colspan="${isE3?2:3}" style="font-size:13px">الرتبة: <span class="v ${has?cls(final):''}">${has?rank:'—'}</span></td></tr>
     </table>
     <div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>
   </div>`;
@@ -1393,6 +1435,19 @@ async function downloadPDF(){
     const w=pw-2*m,maxH=ph-2*m;
     const els=[...host.querySelectorAll('.bul')];
     let first=true;
+    if(!land){
+      const half=maxH/2-2;
+      for(let i=0;i<els.length;i+=2){
+        if(i>0)pdf.addPage();
+        for(let j=0;j<2&&i+j<els.length;j++){
+          const c=await html2canvas(els[i+j],{scale:2,backgroundColor:'#fff',useCORS:true});
+          let ww=w,hh=c.height*ww/c.width;
+          if(hh>half){hh=half;ww=c.width*hh/c.height;}
+          pdf.addImage(c.toDataURL('image/jpeg',.92),'JPEG',m+(w-ww)/2,m+j*(maxH/2+2),ww,hh);
+        }
+        if(i+1<els.length){pdf.setDrawColor(150);pdf.setLineDashPattern([2,2],0);pdf.line(m,m+maxH/2+1,pw-m,m+maxH/2+1);pdf.setLineDashPattern([],0);}
+      }
+    }else
     for(const el of els){
       const sc=2,c=await html2canvas(el,{scale:sc,backgroundColor:'#fff',useCORS:true});
       const k=w/c.width,pagePx=maxH/k;
