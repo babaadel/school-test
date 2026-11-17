@@ -556,10 +556,11 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <div class="fg"><label>الرقم المدرسي</label><input id="m-schoolnum" placeholder="2024001"></div>
       <div class="fg"><label>الجنس</label><select id="m-gender"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
     </div>
-    <div class="fr"><div class="fg"><label>القسم</label><select id="m-class"></select></div></div>
+    <div class="fr"><div class="fg"><label>القسم</label><select id="m-class" onchange="if(!editingStu)fillNextCall()"></select></div></div>
+    <div id="m-added" style="font-size:12px;color:#166534;min-height:16px;margin-bottom:6px"></div>
     <div class="modal-footer">
-      <button class="btn btn-green" style="flex:1" onclick="saveStu()">✅ حفظ</button>
-      <button class="btn" style="flex:1;background:#f3f4f6" onclick="editingStu=null;closeModal('modal-student')">إلغاء</button>
+      <button class="btn btn-green" style="flex:1" id="m-save-btn" onclick="saveStu()">✅ حفظ</button>
+      <button class="btn" style="flex:1;background:#f3f4f6" id="m-cancel-btn" onclick="editingStu=null;closeModal('modal-student')">إلغاء</button>
     </div>
   </div>
 </div>
@@ -902,9 +903,13 @@ function openModal(id){
       }
     }else{
       document.getElementById('m-name').value='';
-      document.getElementById('m-callnum').value='';
       document.getElementById('m-schoolnum').value='';
+      document.getElementById('m-added').textContent='';
+      fillNextCall();
+      setTimeout(()=>document.getElementById('m-name').focus(),150);
     }
+    document.getElementById('m-save-btn').textContent=editingStu?'✅ حفظ':'✅ حفظ وإضافة التالي';
+    document.getElementById('m-cancel-btn').textContent=editingStu?'إلغاء':'إنهاء';
   }
   if(id==='modal-days'){
     document.getElementById('days-checks').innerHTML=DAYS.map((d,i)=>`<label class="chk"><input type="checkbox" value="${i}" ${S.schedule.workDays.includes(i)?'checked':''}> ${d}</label>`).join('');
@@ -1072,11 +1077,25 @@ function saveStu(){
   }else{rec=Object.assign({id:Date.now()},data);S.students.push(rec);}
   dirty.stu[rec.id]=JSON.parse(JSON.stringify(rec));
   curSC=ci;
-  sv(true);closeModal('modal-student');
+  sv(true);
   mkAllCtabs();
   setTimeout(()=>{renderStuTable();updateStats();},50);
-  showToast(wasEdit?'✅ تم حفظ التعديل':'✅ تمت الإضافة');
+  if(wasEdit){closeModal('modal-student');showToast('✅ تم حفظ التعديل');return;}
+  // وضع الإضافة المتتالية: تبقى النافذة مفتوحة للتلميذ التالي
+  document.getElementById('m-added').textContent='✅ أُضيف: '+rec.name+' (رقم '+(rec.callNum||'—')+')';
+  document.getElementById('m-name').value='';
+  document.getElementById('m-schoolnum').value='';
+  fillNextCall();
+  document.getElementById('m-name').focus();
 }
+function fillNextCall(){
+  const ci=parseInt(document.getElementById('m-class').value);
+  const nums=(S.students||[]).filter(s=>s.classIdx===ci).map(s=>parseInt(s.callNum)||0);
+  document.getElementById('m-callnum').value=(nums.length?Math.max(...nums):0)+1;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&['m-name','m-schoolnum','m-callnum'].includes(document.activeElement&&document.activeElement.id)&&!editingStu){e.preventDefault();saveStu();}
+});
 let editingStu=null;
 function editStu(id){
   const s=(S.students||[]).find(x=>x.id===id);
@@ -1230,7 +1249,7 @@ const BUL_CSS=`
 .bul-banner{width:62%;margin:0 auto 12px;text-align:center;font-size:21px;font-weight:800;color:#1a3a2a;background:linear-gradient(#e3f4de,#c9e8c1);border:2px solid #9ccc9c;border-radius:12px;padding:8px 0;box-shadow:0 2px 0 #8bb88b}
 .bul-info{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:11.5px;font-weight:700;margin-bottom:8px}
 .bul-info b{color:#1d4ed8;font-weight:700}
-.bul-rank{text-align:left;margin:0 0 5px}.bul-rank>span{display:inline-block;border:2.2px solid #000;border-radius:6px;padding:2px 14px;font-size:13px;font-weight:800}
+.bul-rank{text-align:left;margin:0 0 5px}.bul-rank>span{display:inline-block;border:2.2px solid #dc2626;border-radius:6px;padding:2px 14px;font-size:13px;font-weight:800;color:#dc2626}.bul-rank>span+span{margin-right:8px}.bul-rank .v{color:#dc2626!important}
 .cutline{border-top:1.5px dashed #777;height:0;margin:5mm 0}
 .bul table{width:100%;border-collapse:collapse;table-layout:fixed}
 .bul th,.bul td{border:2.2px solid #000;padding:6px 3px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700}
@@ -1243,14 +1262,15 @@ const BUL_CSS=`
 .bul-sign{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;font-weight:800;min-height:56px}
 .bul-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .bul.bulc{max-width:none}
-.bul table.bul-cls{table-layout:fixed;min-width:760px}
+.bul table.bul-cls{table-layout:fixed;min-width:980px}
 .bul-cls thead{display:table-header-group}.bul-cls tr{break-inside:avoid;page-break-inside:avoid}
 .bul .rt{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;margin:0 auto;height:104px;line-height:1.2}
-.bul table.bul-cls th,.bul table.bul-cls td{font-size:9.5px;padding:4px 1px;line-height:1.25}
+.bul table.bul-cls th,.bul table.bul-cls td{font-size:12.5px;padding:10px 2px;line-height:1.35}
 .bul table.bul-cls td.r{text-align:right;white-space:nowrap;padding-right:6px}
 .bul .bul-info b.ok{color:#15803d}.bul .bul-info b.no{color:#dc2626}
 .bul table.bul-cls td.ok{color:#15803d}.bul table.bul-cls td.no{color:#dc2626}
-@media print{.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{margin:0 auto;max-width:none;break-after:auto;page-break-after:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.bul.bulc{break-after:page;page-break-after:always}.bul.bulc:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc){height:132mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid;padding:2.5mm 4mm;display:flex;flex-direction:column}.bul.pgend{break-after:page;page-break-after:always}.bul.pgend:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc) .bul-side{font-size:9px;line-height:1.45}.bul:not(.bulc) .bul-logo{width:46px;height:46px}.bul:not(.bulc) .bul-exam{font-size:13px;margin:2px 0}.bul:not(.bulc) .bul-banner{font-size:15px;padding:2px 0;margin-bottom:4px}.bul:not(.bulc) .bul-info{margin-bottom:3px;font-size:10.5px}.bul:not(.bulc) th,.bul:not(.bulc) td{padding:2.6px 3px;font-size:11px}.bul:not(.bulc) .v{font-size:11.5px}.bul:not(.bulc) .res{font-size:17px}.bul:not(.bulc) .bul-sign{min-height:18px;margin-top:auto;padding-top:3px;font-size:11px}.bul:not(.bulc) .bul-rank{margin-bottom:3px}.bul:not(.bulc) .bul-rank>span{padding:1px 12px;font-size:11.5px}@page{size:A4;margin:10mm}}
+@page land{size:A4 landscape;margin:10mm}
+@media print{.bul.bulc{page:land}.bul table.bul-cls th,.bul table.bul-cls td{font-size:10.5px;padding:6px 1px}.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{margin:0 auto;max-width:none;break-after:auto;page-break-after:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.bul.bulc{break-after:page;page-break-after:always}.bul.bulc:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc){height:132mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid;padding:2.5mm 4mm;display:flex;flex-direction:column}.bul.pgend{break-after:page;page-break-after:always}.bul.pgend:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc) .bul-side{font-size:9px;line-height:1.45}.bul:not(.bulc) .bul-logo{width:46px;height:46px}.bul:not(.bulc) .bul-exam{font-size:13px;margin:2px 0}.bul:not(.bulc) .bul-banner{font-size:15px;padding:2px 0;margin-bottom:4px}.bul:not(.bulc) .bul-info{margin-bottom:3px;font-size:10.5px}.bul:not(.bulc) th,.bul:not(.bulc) td{padding:2.6px 3px;font-size:11px}.bul:not(.bulc) .v{font-size:11.5px}.bul:not(.bulc) .res{font-size:17px}.bul:not(.bulc) .bul-sign{min-height:18px;margin-top:auto;padding-top:3px;font-size:11px}.bul:not(.bulc) .bul-rank{margin-bottom:3px}.bul:not(.bulc) .bul-rank>span{padding:1px 12px;font-size:11.5px}@page{size:A4;margin:10mm}}
 `;
 (function(){try{if(document.head&&document.createElement){const st=document.createElement('style');st.textContent=BUL_CSS;document.head.appendChild(st);}}catch(e){}})();
 
@@ -1346,11 +1366,10 @@ function buildBulletin(stu,ci,exam,rank,pgend){
       <div>الرقم المدرسي: <b>${esc(stu.schoolNum||'—')}</b></div>
       <div>رقم النداء: <b>${esc(stu.callNum||'—')}</b></div>
     </div>
-    <div class="bul-rank"><span>الرتبة: <span class="v ${has?cls(final):''}">${has?rank:'—'}</span></span></div>
+    <div class="bul-rank">${isE3?`<span>المعدل العام: <span class="v">${has?f2(final):'—'}</span></span>`:''}<span>الرتبة: <span class="v">${has?rank:'—'}</span></span></div>
     <table>
       <colgroup>${isE3?'<col style="width:27%"><col style="width:18%"><col style="width:24%"><col style="width:31%">':'<col style="width:34%"><col style="width:24%"><col style="width:42%">'}</colgroup>
       ${rows}
-      ${isE3?`<tr><td colspan="4" style="font-size:13px">المعدل العام: <span class="v ${has?cls(final):''}">${has?f2(final):'—'}</span></td></tr>`:''}
 
     </table>
     <div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>
