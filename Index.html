@@ -232,6 +232,8 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
   .no-print,.po-header{display:none!important}
   .kashf{padding:8px}
 }
+.tbadge{background:#dc2626;color:#fff;border-radius:10px;padding:0 6px;font-size:11px;margin-right:4px;font-weight:800}
+.trow{padding:6px 0;border-bottom:1px solid #eee}
 </style>
 </head>
 <body>
@@ -267,7 +269,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
   </div>
 </header>
 <nav class="tabs">
-    <div class="tab active admin-only" id="tab-setup" onclick="showPage('setup',this)">⚙️ إعداد</div>
+    <div class="tab active admin-only" id="tab-setup" onclick="showPage('setup',this)">⚙️ إعداد<span class="tbadge" id="today-badge" style="display:none"></span></div>
     <div class="tab" onclick="showPage('staff',this)">👨‍🏫 الطاقم</div>
     <div class="tab" onclick="showPage('students',this)">👥 التلاميذ</div>
     <div class="tab" onclick="showPage('grades',this)">📝 الدرجات</div>
@@ -282,6 +284,14 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
 
 <main>
 <div id="page-setup" class="page active admin-only">
+  <div class="card" id="today-card">
+    <div class="card-title">📋 غياب التلاميذ اليوم <span id="today-date" style="font-size:12px;font-weight:600;color:#555"></span></div>
+    <div id="today-body"></div>
+    <div class="btn-group" style="margin-top:8px">
+      <button class="btn btn-sm" style="background:#25D366;color:#fff" onclick="shareToday()">📲 مشاركة ملخص اليوم</button>
+      <button class="btn btn-blue btn-sm" onclick="refreshToday(true)">🔄 تحديث</button>
+    </div>
+  </div>
   <div class="card">
     <div class="card-title">🏫 إعداد المدرسة</div>
     <div class="fr">
@@ -293,6 +303,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     <div class="fr">
       <div class="fg"><label>عبارة تظهر في الكشف الفردي (اختياري)</label><input id="inp-motto" placeholder="بالعلم ترتقي الأمم"></div>
     </div>
+    <div class="fr"><div class="fg"><label>رقم واتساب المدير (لاستقبال ملخص الغياب)</label><input id="inp-dirphone" type="tel" placeholder="مثال: 22212345678"></div></div>
     <button class="btn btn-green" onclick="saveSchool()">💾 حفظ ومزامنة</button>
   </div>
   <div class="card">
@@ -405,6 +416,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     <div class="att-summary" id="att-summary"></div>
     <div class="att-note" id="att-note"></div>
     <div class="btn-group" id="att-tools" style="margin-bottom:8px"><button class="btn btn-green btn-sm" onclick="attAllPresent()">✔ الكل حاضر</button></div>
+    <div id="att-send-wrap" style="display:none;margin-bottom:8px"><button class="btn btn-sm" style="background:#25D366;color:#fff" onclick="sendAttWA()">📲 إرسال الملخص للمدير (واتساب)</button></div>
     <div id="att-wrap"></div>
   </div>
 </div>
@@ -646,7 +658,7 @@ let curSC=0,curGC=0,curEx=1,curRkC=0,curRkEx=1,curPrC=0,curPrEx=1;
 let saveTimer=null;
 
 // ============ JSONBIN SYNC (دمج آمن لعدة مستخدمين) ============
-const ADMIN_KEYS=['school','year','district','region','regLine','distLine','motto','classes','staff','students','auth','schedule','satt','archive'];
+const ADMIN_KEYS=['school','year','district','region','regLine','distLine','motto','classes','staff','students','auth','schedule','satt','archive','dirPhone'];
 function newDirty(){return {year:false,admin:false,g:{},att:{},login:{},loginSet:{},stu:{}};}
 let dirty=newDirty(),saving=false,againSave=false;
 function hasDirty(d){return d.admin||d.year||Object.keys(d.g).length>0||Object.keys(d.att).length>0||Object.keys(d.login).length>0||Object.keys(d.stu).length>0;}
@@ -798,7 +810,7 @@ function normalizeState(){
 }
 function refreshAll(){
   if(role==='none')return;
-  if(isAdmin)renderSetup();
+  if(isAdmin){renderSetup();renderToday();}
   mkAllCtabs();
   renderStuTable();renderGrades();renderRanking();renderStaff();renderSchedule();renderAtt();
   if(isAdmin)renderSAtt();
@@ -826,6 +838,8 @@ function renderSetup(){
   document.getElementById('inp-district').value=S.distLine||'';
   document.getElementById('inp-region').value=S.regLine||'';
   document.getElementById('inp-motto').value=S.motto||'';
+  document.getElementById('inp-dirphone').value=S.dirPhone||'';
+  renderToday();
   let h='';
   for(let i=0;i<6;i++)
     h+=`<div class="fr" style="margin-bottom:6px">
@@ -841,6 +855,7 @@ function saveSchool(){
   S.distLine=document.getElementById('inp-district').value.trim();
   S.regLine=document.getElementById('inp-region').value.trim();
   S.motto=document.getElementById('inp-motto').value.trim();
+  S.dirPhone=document.getElementById('inp-dirphone').value.trim();
   sv();updateHdr();
 }
 function saveClasses(){
@@ -1602,6 +1617,60 @@ function downloadBackup(){
   showToast('✅ تم تنزيل النسخة الاحتياطية');
 }
 
+
+// ============ تنبيه المدير بغياب التلاميذ ============
+function waUrl(text){
+  let p=(S.dirPhone||'').replace(/\D/g,'');if(p.length===8)p='222'+p;
+  return 'https://wa.me/'+p+'?text='+encodeURIComponent(text);
+}
+function attLines(ci,date){
+  const stus=getStuByClass(ci),day=dayAtt(ci,date);
+  const nm=k=>stus.filter(s=>day[s.id]===k).map(s=>s.name);
+  const a=nm('a'),l=nm('l'),e=nm('e');
+  let m='▪️ '+S.classes[ci]+' — حاضرون '+(stus.length-a.length-l.length-e.length)+' من '+stus.length+'\n';
+  if(a.length)m+='   ❌ غائبون ('+a.length+'): '+a.join('، ')+'\n';
+  if(l.length)m+='   ⏰ متأخرون ('+l.length+'): '+l.join('، ')+'\n';
+  if(e.length)m+='   📄 بعذر ('+e.length+'): '+e.join('، ')+'\n';
+  return m;
+}
+function sendAttWA(){
+  const ci=curAC,date=attDate;
+  if(!dayAtt(ci,date)._){showToast('⚠️ سجّل الحضور أولًا');return;}
+  if(!S.dirPhone)showToast('ℹ️ لم يُسجَّل رقم المدير، اختر جهة الاتصال بنفسك');
+  window.open(waUrl('📋 '+(S.school||'المدرسة')+'\nغياب يوم '+date+'\n'+attLines(ci,date)),'_blank');
+}
+function shareToday(){
+  const d=todayISO();let m='📋 '+(S.school||'المدرسة')+'\nملخص غياب التلاميذ — '+d+'\n\n',any=false;
+  S.classes.forEach((c,ci)=>{if(getStuByClass(ci).length&&dayAtt(ci,d)._){m+=attLines(ci,d);any=true;}});
+  if(!any){showToast('⚠️ لم يُسجَّل أي غياب اليوم بعد');return;}
+  window.open(waUrl(m),'_blank');
+}
+function renderToday(){
+  const body=document.getElementById('today-body');if(!body)return;
+  const d=todayISO();let totalA=0,html='',pending=[];
+  $('today-date').textContent=d;
+  (S.classes||[]).forEach((c,ci)=>{
+    const stus=getStuByClass(ci);if(!stus.length)return;
+    const day=dayAtt(ci,d);
+    if(!day._){pending.push(c);return;}
+    const nm=k=>stus.filter(s=>day[s.id]===k);
+    const a=nm('a'),l=nm('l'),e=nm('e');totalA+=a.length;
+    html+=`<div class="trow"><b>${esc(c)}</b> — غائب ${a.length}${l.length?' • متأخر '+l.length:''}${e.length?' • بعذر '+e.length:''}<div style="font-size:12px;color:#555">${a.length?esc(a.map(s=>s.name).join('، ')):'لا غياب'}</div></div>`;
+  });
+  if(pending.length)html+=`<div style="margin-top:8px;font-size:12px;background:#fef9c3;color:#854d0e;border-radius:8px;padding:6px 10px">⏳ لم يُسجَّل بعد: ${pending.map(esc).join('، ')}</div>`;
+  body.innerHTML=html||'<div class="empty">لا يوجد تلاميذ</div>';
+  const bd=document.getElementById('today-badge');
+  if(bd){bd.textContent=totalA;bd.style.display=totalA>0?'':'none';}
+}
+async function refreshToday(manual){
+  if(!isAdmin||viewingYear||saving||hasDirty(dirty))return;
+  try{const r=await fetchLatest();if(r&&typeof r==='object'&&r.att)S.att=r.att;}catch(e){}
+  renderToday();
+  if(document.getElementById('page-att').classList.contains('active'))renderAtt();
+  if(manual)showToast('✅ تم التحديث');
+}
+setInterval(()=>{if(document.visibilityState==='visible')refreshToday(false);},60000);
+
 // ============ STATS ============
 function updateStats(){
   const total=(S.students||[]).length;
@@ -1982,6 +2051,7 @@ function renderAtt(){
   document.getElementById('att-note').textContent=
     !canEdit(ci)?'🔒 هذا القسم ليس من أقسامك، للاطلاع فقط.':(date>todayISO()?'⏳ لا يمكن تسجيل الحضور لتاريخ قادم.':'');
   document.getElementById('att-tools').style.display=edit?'':'none';
+  document.getElementById('att-send-wrap').style.display=(canEdit(ci)&&taken)?'':'none';
   wrap.innerHTML=stus.map(s=>{
     const cur=day[s.id]||'';const t=attTotals(ci,s.id);
     return `<div class="att-row"><div class="att-name"><b>${esc(s.callNum||'—')}</b> ${esc(s.name)}<div class="att-sub">الغياب ${t.a} • بعذر ${t.e} • تأخر ${t.l}</div></div>
