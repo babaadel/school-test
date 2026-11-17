@@ -1175,7 +1175,7 @@ function renderRanking(){
 
 // ============ الكشف الفردي (النموذج) ============
 const BUL_CSS=`
-.bul{font-family:'Tajawal',sans-serif;direction:rtl;color:#000;background:#fff;width:100%;max-width:560px;margin:0 auto 18px;padding:14px;border:1px solid #ddd;font-size:12px;box-sizing:border-box}
+.bul{font-family:'Tajawal',sans-serif;direction:rtl;color:#000;background:#fff;width:100%;max-width:560px;margin:0 auto 18px;padding:14px;border:5px double #006233;outline:2px solid #c9a227;outline-offset:2px;font-size:12px;box-sizing:border-box}
 .bul *{box-sizing:border-box}
 .bul-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
 .bul-side{flex:1;font-size:10px;font-weight:700;line-height:1.8}
@@ -1185,8 +1185,10 @@ const BUL_CSS=`
 .bul-banner{width:62%;margin:0 auto 12px;text-align:center;font-size:21px;font-weight:800;color:#1a3a2a;background:linear-gradient(#e3f4de,#c9e8c1);border:2px solid #9ccc9c;border-radius:12px;padding:8px 0;box-shadow:0 2px 0 #8bb88b}
 .bul-info{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:11.5px;font-weight:700;margin-bottom:8px}
 .bul-info b{color:#1d4ed8;font-weight:700}
+.bul-rank{text-align:left;margin:0 0 5px}.bul-rank>span{display:inline-block;border:2.2px solid #000;border-radius:6px;padding:2px 14px;font-size:13px;font-weight:800}
+.cutline{border-top:1.5px dashed #777;height:0;margin:5mm 0}
 .bul table{width:100%;border-collapse:collapse;table-layout:fixed}
-.bul th,.bul td{border:1.5px solid #000;padding:6px 3px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700}
+.bul th,.bul td{border:2.2px solid #000;padding:6px 3px;text-align:center;vertical-align:middle;font-size:12px;font-weight:700}
 .bul th{font-weight:800;background:#fff;color:#000;white-space:normal;line-height:1.35;font-size:11.5px}
 .bul td.sub{font-weight:700}
 .bul .v{font-size:14px;font-weight:800;direction:ltr;unicode-bidi:isolate}
@@ -1203,7 +1205,7 @@ const BUL_CSS=`
 .bul table.bul-cls td.r{text-align:right;white-space:nowrap;padding-right:6px}
 .bul .bul-info b.ok{color:#15803d}.bul .bul-info b.no{color:#dc2626}
 .bul table.bul-cls td.ok{color:#15803d}.bul table.bul-cls td.no{color:#dc2626}
-@media print{.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{border:none;margin:0 auto;padding:0;max-width:none;break-after:auto;page-break-after:auto}.bul.bulc{break-after:page;page-break-after:always}.bul.bulc:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc){height:136mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid;border-bottom:1px dashed #999;padding-bottom:2mm}.bul.pgend{break-after:page;page-break-after:always;border-bottom:none}.bul.pgend:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc) .bul-side{font-size:9px;line-height:1.5}.bul:not(.bulc) .bul-logo{width:52px;height:52px}.bul:not(.bulc) .bul-exam{font-size:14px;margin:3px 0}.bul:not(.bulc) .bul-banner{font-size:16px;padding:3px 0;margin-bottom:5px}.bul:not(.bulc) .bul-info{margin-bottom:4px;font-size:10.5px}.bul:not(.bulc) th,.bul:not(.bulc) td{padding:2px 3px;font-size:11px}.bul:not(.bulc) .v{font-size:12px}.bul:not(.bulc) .res{font-size:18px}.bul:not(.bulc) .bul-sign{min-height:24px;margin-top:4px}@page{size:A4;margin:10mm}}
+@media print{.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{margin:0 auto;max-width:none;break-after:auto;page-break-after:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.bul.bulc{break-after:page;page-break-after:always}.bul.bulc:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc){height:132mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid;padding:2.5mm 4mm;display:flex;flex-direction:column}.bul.pgend{break-after:page;page-break-after:always}.bul.pgend:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc) .bul-side{font-size:9px;line-height:1.45}.bul:not(.bulc) .bul-logo{width:46px;height:46px}.bul:not(.bulc) .bul-exam{font-size:13px;margin:2px 0}.bul:not(.bulc) .bul-banner{font-size:15px;padding:2px 0;margin-bottom:4px}.bul:not(.bulc) .bul-info{margin-bottom:3px;font-size:10.5px}.bul:not(.bulc) th,.bul:not(.bulc) td{padding:2.6px 3px;font-size:11px}.bul:not(.bulc) .v{font-size:11.5px}.bul:not(.bulc) .res{font-size:17px}.bul:not(.bulc) .bul-sign{min-height:18px;margin-top:auto;padding-top:3px;font-size:11px}.bul:not(.bulc) .bul-rank{margin-bottom:3px}.bul:not(.bulc) .bul-rank>span{padding:1px 12px;font-size:11.5px}@page{size:A4;margin:10mm}}
 `;
 (function(){try{if(document.head&&document.createElement){const st=document.createElement('style');st.textContent=BUL_CSS;document.head.appendChild(st);}}catch(e){}})();
 
@@ -1234,7 +1236,7 @@ function buildBulletins(ci,exam,which){
   const fin=s=>parseFloat(exam===3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci));
   const rankOf=s=>1+all.filter(o=>fin(o)>fin(s)).length;
   const list=which&&which!=='all'?all.filter(s=>String(s.id)===String(which)):all.slice().sort((a,b)=>rankOf(a)-rankOf(b)||parseFloat(a.callNum||0)-parseFloat(b.callNum||0));
-  return list.map((s,i)=>buildBulletin(s,ci,exam,rankOf(s),i%2===1||i===list.length-1)).join('');
+  return list.map((s,i)=>buildBulletin(s,ci,exam,rankOf(s),i%2===1||i===list.length-1)+(i%2===0&&i<list.length-1?'<div class="cutline"></div>':'')).join('');
 }
 function buildBulletin(stu,ci,exam,rank,pgend){
   const subs=getSubs(ci),n=subs.length,mt=maxTotal(ci);
@@ -1299,10 +1301,12 @@ function buildBulletin(stu,ci,exam,rank,pgend){
       <div>الرقم المدرسي: <b>${esc(stu.schoolNum||'—')}</b></div>
       <div>رقم النداء: <b>${esc(stu.callNum||'—')}</b></div>
     </div>
+    <div class="bul-rank"><span>الرتبة: <span class="v ${has?cls(final):''}">${has?rank:'—'}</span></span></div>
     <table>
       <colgroup>${isE3?'<col style="width:27%"><col style="width:18%"><col style="width:24%"><col style="width:31%">':'<col style="width:34%"><col style="width:24%"><col style="width:42%">'}</colgroup>
       ${rows}
-      <tr>${isE3?`<td colspan="2" style="font-size:13px">المعدل العام: <span class="v ${has?cls(final):''}">${has?f2(final):'—'}</span></td>`:''}<td colspan="${isE3?2:3}" style="font-size:13px">الرتبة: <span class="v ${has?cls(final):''}">${has?rank:'—'}</span></td></tr>
+      ${isE3?`<tr><td colspan="4" style="font-size:13px">المعدل العام: <span class="v ${has?cls(final):''}">${has?f2(final):'—'}</span></td></tr>`:''}
+
     </table>
     <div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>
   </div>`;
@@ -1379,7 +1383,6 @@ function buildKashf(ci,exam){
       <div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>
     </div>
     <div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup><thead>${head}</thead><tbody>${rows||`<tr><td colspan="${subs.length+8}">لا يوجد طلاب</td></tr>`}</tbody></table></div>
-    <div style="font-size:10px;margin-top:6px">* المعدل = المجموع ÷ 10${isE3?' ، المعدل العام = (معدل ف١ + ف٢ + ف٣) ÷ 3':''}</div>
     <div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>
   </div>`;
 }
@@ -1425,7 +1428,7 @@ async function downloadPDF(){
     host.style.cssText='position:absolute;left:-99999px;top:0;background:#fff;width:'+(land?1150:760)+'px';
     host.innerHTML=buildPrint();
     document.body.appendChild(host);
-    host.querySelectorAll('.bul').forEach(b=>{b.style.maxWidth='none';b.style.border='none';b.style.margin='0';b.style.width='100%';});
+    host.querySelectorAll('.bul').forEach(b=>{b.style.maxWidth='none';b.style.margin='0';b.style.width='100%';b.style.outline='none';});
     host.querySelectorAll('.bul-wrap').forEach(w=>w.style.overflow='visible');
     host.querySelectorAll('table.bul-cls').forEach(t=>t.style.minWidth='0');
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;
@@ -1436,7 +1439,7 @@ async function downloadPDF(){
     const els=[...host.querySelectorAll('.bul')];
     let first=true;
     if(!land){
-      const half=maxH/2-2;
+      const half=maxH/2-2;let firstBottom=m;
       for(let i=0;i<els.length;i+=2){
         if(i>0)pdf.addPage();
         for(let j=0;j<2&&i+j<els.length;j++){
@@ -1444,8 +1447,9 @@ async function downloadPDF(){
           let ww=w,hh=c.height*ww/c.width;
           if(hh>half){hh=half;ww=c.width*hh/c.height;}
           pdf.addImage(c.toDataURL('image/jpeg',.92),'JPEG',m+(w-ww)/2,m+j*(maxH/2+2),ww,hh);
+          if(j===0)firstBottom=m+hh;
         }
-        if(i+1<els.length){pdf.setDrawColor(150);pdf.setLineDashPattern([2,2],0);pdf.line(m,m+maxH/2+1,pw-m,m+maxH/2+1);pdf.setLineDashPattern([],0);}
+        if(i+1<els.length){const ly=(firstBottom+m+maxH/2+2)/2;pdf.setDrawColor(120);pdf.setLineDashPattern([2,2],0);pdf.line(m,ly,pw-m,ly);pdf.setLineDashPattern([],0);}
       }
     }else
     for(const el of els){
