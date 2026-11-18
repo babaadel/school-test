@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>منصة النتائج المدرسية - موريتانيا</title>
+<title>منصة مدرستي  - موريتانيا</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 :root{
@@ -103,6 +103,11 @@ tr:nth-child(even) td{background:#f9fffe}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--gd);color:white;padding:10px 20px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;transition:transform .3s;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .empty{text-align:center;padding:24px;color:var(--gray);font-size:13px}
+.stu-count{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.gov-stats{flex-wrap:wrap}
+.men-wrap{width:100%;display:flex;gap:6px;align-items:center;margin-top:2px}
+.men-wrap label{margin:0;white-space:nowrap;font-size:11px}
+.men-in{padding:5px 9px;font-size:12px}
 
 /* LOADING OVERLAY */
 .loading-overlay{position:fixed;inset:0;background:rgba(26,58,42,.9);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;transition:opacity .3s}
@@ -279,6 +284,8 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     <div class="gov-site"><div class="gs1" id="hdr-school">منصة النتائج المدرسية</div><div class="gs2">البوابة الرقمية للنتائج المدرسية</div></div>
     <div class="gov-stats">
       <div class="hst"><div class="hsn" id="h-total">0</div><div class="hsl">تلميذ</div></div>
+      <div class="hst"><div class="hsn" id="h-male">0</div><div class="hsl">ذكور</div></div>
+      <div class="hst"><div class="hsn" id="h-female">0</div><div class="hsl">إناث</div></div>
       <div class="hst"><div class="hsn" id="h-pass">0</div><div class="hsl">ناجح</div></div>
     </div>
     <div class="gov-actions">
@@ -358,6 +365,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <button class="btn btn-green btn-sm" onclick="addStuClick()">+ إضافة</button>
     </div>
     <div class="ctabs" id="stu-ctabs"></div>
+    <div class="stu-count" id="stu-count"></div>
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>رقم النداء</th><th class="r">الاسم الكامل</th><th>الرقم المدرسي</th><th>الجنس</th><th>تعديل</th><th class="admin-only">حذف</th></tr></thead>
@@ -1164,8 +1172,11 @@ function deleteStu(id){
   sv(true);renderStuTable();updateStats();
 }
 function getStuByClass(ci){return (S.students||[]).filter(s=>s.classIdx===ci).sort((a,b)=>parseInt(a.callNum||0)-parseInt(b.callNum||0));}
+function genderCounts(list){const f=list.filter(x=>x.gender==='أنثى').length;return {m:list.length-f,f,t:list.length};}
 function renderStuTable(){
   const list=getStuByClass(curSC);
+  const gc=genderCounts(list),scEl=document.getElementById('stu-count');
+  if(scEl)scEl.innerHTML=`<span class="badge bp">ذكور ${gc.m}</span> <span class="badge" style="background:#fce7f3;color:#9d174d">إناث ${gc.f}</span> <span class="badge" style="background:#e5e7eb;color:#374151">المجموع ${gc.t}</span>`;
   const tb=document.getElementById('stu-tbody');
   if(!list.length){tb.innerHTML=`<tr><td colspan="6" class="empty">لا يوجد طلاب</td></tr>`;return;}
   tb.innerHTML=list.map(s=>`<tr>
@@ -1306,7 +1317,7 @@ const BUL_CSS=`
 .bul th{font-weight:800;background:#fff;color:#000;white-space:normal;line-height:1.35;font-size:14px}
 .bul td.sub{font-weight:800}
 .bul .v{font-size:14px;font-weight:800;direction:ltr;unicode-bidi:isolate}
-.bul .ok{color:#15803d}.bul .no{color:#dc2626}
+.bul .ok{color:#15803d}.bul .no{color:#dc2626}.bul .wk{color:#c2410c}
 .bul .res{font-size:14px;font-weight:800}
 .bul .mot{font-size:14px;font-weight:800;line-height:1.7;padding:6px}
 .bul-sign{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;font-weight:800;min-height:56px}
@@ -1318,8 +1329,8 @@ const BUL_CSS=`
 .bul .rt{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;margin:0 auto;height:104px;line-height:1.2}
 .bul table.bul-cls td{font-size:14px;font-weight:800;padding:9px 1px;line-height:1.3}.bul table.bul-cls th{font-size:14px;font-weight:800;padding:10px 2px;line-height:1.25}.bul table.bul-cls .v{font-size:14px}.bul table.bul-cls thead tr{height:170px}
 .bul table.bul-cls td.r{text-align:right;white-space:normal;word-break:break-word;padding:5px 5px 5px 2px}
-.bul .bul-info b.ok{color:#15803d}.bul .bul-info b.no{color:#dc2626}
-.bul table.bul-cls td.ok{color:#15803d}.bul table.bul-cls td.no{color:#dc2626}
+.bul .bul-info b.ok{color:#15803d}.bul .bul-info b.no{color:#dc2626}.bul .bul-info b.wk{color:#c2410c}
+.bul table.bul-cls td.ok{color:#15803d}.bul table.bul-cls td.no{color:#dc2626}.bul table.bul-cls td.wk{color:#c2410c}
 @media print{.bul table.bul-cls td{font-size:14px;font-weight:800;padding:5px 1px}.bul table.bul-cls th{font-size:14px;font-weight:800;padding:8px 1px}.bul table.bul-cls .v{font-size:14px}.bul table.bul-cls thead tr{height:165px}.bul table.bul-cls{min-width:0!important}.bul-wrap{overflow:visible}body{background:#fff!important;min-height:0!important}.bul{margin:0 auto;max-width:none;break-after:auto;page-break-after:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}.bul.bulc{break-after:page;page-break-after:always}.bul.bulc:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc){height:132mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid;padding:2.5mm 4mm;display:flex;flex-direction:column}.bul.pgend{break-after:page;page-break-after:always}.bul.pgend:last-child{break-after:auto;page-break-after:auto}.bul:not(.bulc) .bul-side{font-size:16px;font-weight:800;line-height:1.2}.bul:not(.bulc) .bul-logo{width:46px;height:46px}.bul:not(.bulc) .bul-exam{font-size:13px;margin:1px 0}.bul:not(.bulc) .bul-banner{font-size:15px;padding:1px 0;margin-bottom:2px}.bul:not(.bulc) .bul-info{margin-bottom:2px;font-size:10.5px}.bul:not(.bulc) th,.bul:not(.bulc) td{padding:.6px 3px;font-size:14px;font-weight:800;line-height:1.2}.bul:not(.bulc) .v{font-size:14px}.bul:not(.bulc) .res{font-size:14px}.bul:not(.bulc) .bul-sign{min-height:18px;margin-top:auto;padding-top:3px;font-size:11px}.bul:not(.bulc) .bul-rank{margin-bottom:1px}.bul:not(.bulc) .bul-rank>span{padding:1px 12px;font-size:11.5px}@page{size:A4;margin:10mm}}
 
 .bul.kp{display:flex;flex-direction:column;position:relative;padding-bottom:11mm}
@@ -1355,6 +1366,17 @@ function fillPrStu(){
   if(old&&[...stus.map(s=>String(s.id)),'all'].includes(old))sel.value=old;
   renderResSel();
 }
+const RESL={p:'ناجح',f:'راسب',w:'مزيد من العمل'},RESC={p:'ok',f:'no',w:'wk'};
+function getMen(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._men||'';}
+function setMen(id,ex,v){
+  const stu=(S.students||[]).find(x=>x.id===id);
+  if(!stu||!canEdit(stu.classIdx))return false;
+  v=String(v||'').trim();
+  if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
+  if(v)S.grades[id][ex]._men=v;else delete S.grades[id][ex]._men;
+  markG(id,ex,'_men',v);return true;
+}
+function pickMen(id,v){setMen(id,curPrEx,v);sv();}
 function getRes(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._res||'';}
 function setRes(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
@@ -1363,7 +1385,7 @@ function setRes(id,ex,v){
   if(v)S.grades[id][ex]._res=v;else delete S.grades[id][ex]._res;
   markG(id,ex,'_res',v||'');return true;
 }
-function pickRes(id,v){const cur=getRes(id,curPrEx);setRes(id,curPrEx,cur===v?'':v);sv();renderResSel();}
+function pickRes(id,v){const cur=getRes(id,curPrEx),nr=cur===v?'':v;setRes(id,curPrEx,nr);if(nr!=='p')setMen(id,curPrEx,'');sv();renderResSel();}
 function resAuto(){
   let n=0;
   getStuByClass(curPrC).forEach(st=>{
@@ -1373,22 +1395,24 @@ function resAuto(){
   });
   sv();renderResSel();showToast(n?'✅ تمت التعبئة حسب المعدل، يمكنك تعديل أي تلميذ':'⚠️ لا توجد درجات أو لا تملك صلاحية هذا القسم');
 }
-function resClear(){getStuByClass(curPrC).forEach(st=>setRes(st.id,curPrEx,''));sv();renderResSel();}
+function resClear(){getStuByClass(curPrC).forEach(st=>{setRes(st.id,curPrEx,'');setMen(st.id,curPrEx,'');});sv();renderResSel();}
 function renderResSel(){
   const box=$('res-list');if(!box)return;
   const stus=getStuByClass(curPrC),ok=canEdit(curPrC);
-  const np=stus.filter(x=>getRes(x.id,curPrEx)==='p').length,nf=stus.filter(x=>getRes(x.id,curPrEx)==='f').length;
-  const sm=$('res-sum');if(sm)sm.textContent=(np+nf)?('— ناجح '+np+' • راسب '+nf):'— فارغ';
+  const np=stus.filter(x=>getRes(x.id,curPrEx)==='p').length,nf=stus.filter(x=>getRes(x.id,curPrEx)==='f').length,nw=stus.filter(x=>getRes(x.id,curPrEx)==='w').length;
+  const sm=$('res-sum');if(sm)sm.textContent=(np+nf+nw)?('— ناجح '+np+' • راسب '+nf+(nw?' • مزيد من العمل '+nw:'')):'— فارغ';
   const tools=$('res-tools');if(tools)tools.style.display=ok&&stus.length?'':'none';
-  box.innerHTML=ok?stus.map(x=>{const r=getRes(x.id,curPrEx);
+  box.innerHTML=ok?'<datalist id="men-list"><option value="ممتاز"><option value="جيد جدا"><option value="جيد"><option value="حسن"><option value="مقبول"></datalist>'+stus.map(x=>{const r=getRes(x.id,curPrEx);
     return `<div class="att-row"><div class="att-name"><b>${esc(x.callNum||'—')}</b> ${esc(x.name)}</div><div class="att-btns">
       <button class="att-b ok ${r==='p'?'on':''}" onclick="pickRes(${x.id},'p')">ناجح</button>
-      <button class="att-b no ${r==='f'?'on':''}" onclick="pickRes(${x.id},'f')">راسب</button></div></div>`;}).join('')
+      <button class="att-b wa ${r==='w'?'on':''}" onclick="pickRes(${x.id},'w')">مزيد من العمل</button>
+      <button class="att-b no ${r==='f'?'on':''}" onclick="pickRes(${x.id},'f')">راسب</button></div>
+      ${r==='p'?`<div class="men-wrap"><label>التقدير:</label><input class="men-in" list="men-list" placeholder="اكتب أو اختر (ممتاز، جيد جدا...)" value="${esc(getMen(x.id,curPrEx))}" onchange="pickMen(${x.id},this.value)"></div>`:''}</div>`;}).join('')
     :'<div class="empty">🔒 هذا القسم ليس من أقسامك</div>';
 }
 function hasGr(id,ex){
   const g=((S.grades||{})[id]||{})[ex]||{};
-  return Object.keys(g).some(k=>k!=='_absent'&&k!=='_res'&&g[k]!==undefined&&g[k]!==''&&g[k]!==null);
+  return Object.keys(g).some(k=>k!=='_absent'&&k!=='_res'&&k!=='_men'&&g[k]!==undefined&&g[k]!==''&&g[k]!==null);
 }
 function buildPrint(){
   return prType==='class'?buildKashf(curPrC,curPrEx):buildBulletins(curPrC,curPrEx,$('pr-stu').value);
@@ -1439,7 +1463,7 @@ function buildBulletin(stu,ci,exam,rank,pgend){
       c2=`<td><span class="v ${has?cls(avg):''}">${has?f2(avg)+'\\20':'—'}</span></td>`;
     }
     let c3='',c4='';
-    const remark=`${resV?`<div class="res ${resV==='p'?'ok':'no'}">${resV==='p'?'ناجح':'راسب'}</div>`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${resV?8:0}px">${absTxt}</div>`:''}`;
+    const remark=`${resV?`<div class="res ${RESC[resV]}">${RESL[resV]}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${resV?8:0}px">${absTxt}</div>`:''}`;
     if(isE3){
       if(r===0)c3='<th>معدل الامتحان الأول</th>';
       else if(r===1)c3=`<td rowspan="${sz[0]}">${exAvg(1)}</td>`;
@@ -1508,7 +1532,7 @@ function buildKashf(ci,exam){
   const data=stus.map(s=>({s,has:hasGr(s.id,exam),fin:parseFloat(isE3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci)),res:getRes(s.id,exam)}));
   data.forEach(d=>{d.rank=1+data.filter(o=>o.fin>d.fin).length;});
   data.sort((a,b)=>a.rank-b.rank||parseFloat(a.s.callNum||0)-parseFloat(b.s.callNum||0));
-  const total=data.length,pass=data.filter(d=>d.res==='p').length,fail=data.filter(d=>d.res==='f').length;
+  const total=data.length,pass=data.filter(d=>d.res==='p').length,fail=data.filter(d=>d.res==='f').length,work=data.filter(d=>d.res==='w').length,gc=genderCounts(stus);
   const rt=t=>`<th><div class="rt">${t}</div></th>`;
   // ===== عرض الأعمدة: عمود الاسم على قدر أطول اسم، والباقي على قدر محتواه =====
   const F="800 14px Tajawal,'Segoe UI',Arial,sans-serif",W=prOrient==='l'?1030:710;   // عرض الجدول المطبوع بالبكسل
@@ -1518,7 +1542,8 @@ function buildKashf(ci,exam){
   const wSnum=Math.ceil(mw(data.map(d=>d.s.schoolNum||'—'),0))+5;
   const wSub=subs.map(sb=>Math.max(22,Math.ceil(mw(data.map(d=>((((S.grades||{})[d.s.id]||{})[exam]||{})[sb.name])??'—'),0))+4));
   const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(_tw('00,00',F))+5;
-  const wRes=Math.ceil(Math.max(_tw('ناجح',F),_tw('راسب',F)))+5;
+  const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,exam);return m?['ناجح',m]:['ناجح'];}if(d.res==='f')return ['راسب'];if(d.res==='w')return ['مزيد من','العمل'];return [];};
+  const wRes=Math.ceil(Math.min(90,Math.max(_tw('ناجح',F),_tw('راسب',F),...data.flatMap(resLines).map(t=>_tw(t,F)))))+5;
   const others=[Math.max(18,wRank),Math.max(18,wCall),Math.max(40,wSnum),...wSub,wTot,wAvg,...(isE3?[wAvg,wAvg,wAvg,wAvg]:[]),wRes];
   const oSum=others.reduce((a,b)=>a+b,0);
   let nameW,scale=1;
@@ -1539,17 +1564,17 @@ function buildKashf(ci,exam){
     const s=d.s,g=((S.grades||{})[s.id]||{})[exam]||{};
     const avg=parseFloat(calcAvg(s.id,exam,ci));
     const exA=e=>hasGr(s.id,e)?`<span class="v ${cls(parseFloat(calcAvg(s.id,e,ci)))}">${f2(calcAvg(s.id,e,ci))}</span>`:'—';
-    const lines=Math.max(1,Math.ceil((_tw(s.name,F)+12)/nameW));
+    const nl=Math.max(1,Math.ceil((_tw(s.name,F)+12)/nameW)),lines=Math.max(nl,resLines(d).length);
     const html=`<tr${lines>1?' class="wr"':''}>
       <td>${d.has?`<span class="v">${d.rank}</span>`:'—'}</td>
       <td>${esc(s.callNum||'—')}</td>
-      <td class="r${lines>1?' w':''}">${esc(s.name)}</td>
+      <td class="r${nl>1?' w':''}">${esc(s.name)}</td>
       <td>${esc(s.schoolNum||'—')}</td>
       ${subs.map(sb=>`<td>${g[sb.name]!==undefined&&g[sb.name]!==''?esc(g[sb.name]):'—'}</td>`).join('')}
       <td>${d.has?`<span class="v">${calcTotal(s.id,exam,ci)}</span>`:'—'}</td>
       <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>
       ${isE3?`<td>${exA(1)}</td><td>${exA(2)}</td><td>${exA(3)}</td><td>${d.has?`<span class="v ${cls(d.fin)}">${f2(d.fin)}</span>`:'—'}</td>`:''}
-      <td class="${d.res==='p'?'ok':d.res==='f'?'no':''}">${d.res==='p'?'ناجح':d.res==='f'?'راسب':''}</td>
+      <td class="${RESC[d.res]||''}">${resLines(d).map(esc).join('<br>')}</td>
     </tr>`;
     return {html,w:lines===1?1:1+0.4*(lines-1)};
   });
@@ -1566,8 +1591,8 @@ function buildKashf(ci,exam){
   const lp=pages[pages.length-1];
   if(lp.w>lp.cap-2&&lp.rs.length>1){const mv=lp.rs.pop();lp.w-=mv.w;pages.push({rs:[mv],w:mv.w,cap:CAP2});}   // مساحة للتوقيع
   const info=`<div class="bul-info">
-      <div>عدد الطلاب: <b>${total}</b></div>
-      ${(pass+fail)?`<div>الناجحون: <b class="ok">${pass}</b></div><div>الراسبون: <b class="no">${fail}</b></div><div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>`:''}
+      <div>عدد الطلاب: <b>${total}</b></div><div>ذكور: <b>${gc.m}</b></div><div>إناث: <b>${gc.f}</b></div>
+      ${(pass+fail+work)?`<div>الناجحون: <b class="ok">${pass}</b></div><div>الراسبون: <b class="no">${fail}</b></div>${work?`<div>مزيد من العمل: <b class="wk">${work}</b></div>`:''}<div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>`:''}
     </div>`;
   const tbl=(rs,withHead)=>`<div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup>${withHead?`<thead>${head}</thead>`:''}<tbody>${rs.map(r=>r.html).join('')}</tbody></table></div>`;
   const sign='<div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>';
@@ -1828,6 +1853,9 @@ function goMenu(name){toggleMenu(false);showPage(name,document.getElementById('t
 function updateStats(){
   const total=(S.students||[]).length;
   document.getElementById('h-total').textContent=total;
+  const gcAll=genderCounts(S.students||[]);
+  document.getElementById('h-male').textContent=gcAll.m;
+  document.getElementById('h-female').textContent=gcAll.f;
   const pass=(S.students||[]).filter(s=>{
     const a=parseFloat(calcYearAvg(s.id,s.classIdx));
     return a>0&&a>=10;
@@ -2181,9 +2209,29 @@ function attTotals(ci,sid){
   return {a,l:0,e:0};
 }
 function absTotal(sid,ci){return attTotals(ci,sid).a;}
-function attCanEdit(ci,date){return canEdit(ci)&&attTimeOk(date);}
+function isOnDuty(){
+  if(role!=='teacher')return false;
+  const m=meObj();if(!m)return false;
+  const w=workWindow(),d=new Date();
+  if(!w.days.includes(d.getDay()))return false;
+  const e=getEntry(m.id,d.getDay());if(e.off)return false;
+  const mins=d.getHours()*60+d.getMinutes();
+  return mins>=toMin(e.from)&&mins<=toMin(e.to);
+}
+function attCanEdit(ci,date){return !viewingYear&&role==='teacher'&&myClasses().includes(ci)&&date===todayISO()&&isOnDuty();}
+function attLockMsg(ci,date){
+  if(viewingYear)return '🔒 أرشيف سنة سابقة، للاطلاع فقط.';
+  if(role!=='teacher')return '🔒 تسجيل الحضور مخصص للمعلم المداوم فقط.';
+  if(!myClasses().includes(ci))return '🔒 هذا القسم ليس من أقسامك، للاطلاع فقط.';
+  if(date>todayISO())return '⏳ لا يمكن تسجيل الحضور لتاريخ قادم.';
+  if(date<todayISO())return '🔒 يمكن تسجيل الحضور ليوم اليوم فقط.';
+  const m=meObj(),d=new Date();
+  if(!workWindow().days.includes(d.getDay()))return '⏰ اليوم ليس من أيام العمل.';
+  const e=m?getEntry(m.id,d.getDay()):null;
+  return '⏰ التسجيل مخصص للمعلم المداوم أثناء دوامه'+(e&&!e.off?' ('+e.from+' – '+e.to+')':' — لا دوام لك اليوم')+'.';
+}
 function setAtt(ci,date,sid,k){
-  if(!attCanEdit(ci,date)){if(canEdit(ci))showToast('⏰ '+workMsg());return;}
+  if(!attCanEdit(ci,date)){showToast(attLockMsg(ci,date));return;}
   if(!S.att)S.att={};
   const c=S.att[ci]||(S.att[ci]={});const day=c[date]||(c[date]={});
   day._=1;day._by=senderName();
@@ -2193,7 +2241,7 @@ function setAtt(ci,date,sid,k){
 }
 function attAllPresent(){
   const ci=curAC,date=attDate;
-  if(!attCanEdit(ci,date)){if(canEdit(ci))showToast('⏰ '+workMsg());return;}
+  if(!attCanEdit(ci,date)){showToast(attLockMsg(ci,date));return;}
   if(!S.att)S.att={};
   const c=S.att[ci]||(S.att[ci]={});const day=c[date]||(c[date]={});
   day._=1;day._by=senderName();
@@ -2216,7 +2264,7 @@ function renderAtt(){
     `<span class="badge bp">حاضر ${cnt['']}</span> <span class="badge bf">غائب ${cnt.a}</span> `
     +(taken?'<span class="badge" style="background:#e5e7eb;color:#374151">✔ سُجّل هذا اليوم'+(day._by?' — '+esc(day._by):'')+'</span>':'<span class="badge" style="background:#fef9c3;color:#854d0e">لم يُسجَّل بعد</span>');
   document.getElementById('att-note').textContent=
-    !canEdit(ci)?'🔒 هذا القسم ليس من أقسامك، للاطلاع فقط.':(date>todayISO()?'⏳ لا يمكن تسجيل الحضور لتاريخ قادم.':(!attTimeOk(date)?'⏰ '+workMsg():''));
+    edit?'':attLockMsg(ci,date);
   document.getElementById('att-tools').style.display=edit?'':'none';
   document.getElementById('att-send-wrap').style.display=(canEdit(ci)&&taken)?'':'none';
   wrap.innerHTML=stus.map(s=>{
@@ -2304,6 +2352,17 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 init();
+// إخفاء شارة الاستضافة التي يحقنها الموقع المستضيف (ليست جزءًا من هذا الملف)
+(function(){
+  const isBadge=n=>{
+    if(!n||n.nodeType!==1||/^(SCRIPT|STYLE|LINK|META)$/.test(n.tagName))return false;
+    return /netlify/i.test((n.id||'')+' '+(typeof n.className==='string'?n.className:'')+' '+n.tagName+' '+(n.src||'')+' '+(n.textContent||'').slice(0,300));
+  };
+  const sweep=()=>{[...document.body.children,...document.documentElement.children].forEach(n=>{if(isBadge(n))n.remove();});};
+  new MutationObserver(sweep).observe(document.documentElement,{childList:true});
+  new MutationObserver(sweep).observe(document.body,{childList:true});
+  sweep();let k=0;const t=setInterval(()=>{sweep();if(++k>40)clearInterval(t);},1500);
+})();
 </script>
 </body>
 </html>
