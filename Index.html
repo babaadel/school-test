@@ -408,6 +408,10 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <div class="etab" onclick="selPrExam(2,this)">الامتحان الثاني</div>
       <div class="etab" onclick="selPrExam(3,this)">الامتحان الثالث</div>
     </div>
+    <div class="etabs" id="pr-orient" style="display:none">
+      <div class="etab active" onclick="selPrOrient('p',this)">📄 طباعة عمودية</div>
+      <div class="etab" onclick="selPrOrient('l',this)">🖼️ طباعة أفقية (خلايا أوسع)</div>
+    </div>
     <div class="ctabs" id="pr-ctabs"></div>
     <div class="fg" id="pr-stu-wrap" style="margin-top:8px"><label>الطالب</label><select id="pr-stu"></select></div>
     <details class="res-box" id="res-box">
@@ -1330,13 +1334,15 @@ const BUL_CSS=`
 .bul.kp table.bul-cls td.r{white-space:nowrap;overflow:hidden;padding:0 5px 0 1px;text-align:right}
 .bul.kp table.bul-cls td.r.w{white-space:normal;line-height:1.2;padding:2px 5px 2px 1px}
 .bul.kp .bul-exam{margin:6px 0 4px}.bul.kp .bul-banner{margin-bottom:6px;padding:4px 0;font-size:19px}.bul.kp .bul-info{margin-bottom:5px}
-@media print{.bul.bulc.kp{height:272mm;overflow:hidden;margin:0;padding:2mm 2mm 11mm;border-width:4px;break-after:page;page-break-after:always}.bul.bulc.kp:last-child{break-after:auto;page-break-after:auto}.bul.kp table.bul-cls td{padding:0 1px}.bul.kp table.bul-cls thead tr{height:150px}.bul.kp table.bul-cls td.r{padding:0 5px 0 1px}}
+@media print{.bul.bulc.kp{height:272mm;overflow:hidden;margin:0;padding:2mm 2mm 11mm;border-width:4px;break-after:page;page-break-after:always}.bul.bulc.kp.kl{height:186mm}.bul.bulc.kp:last-child{break-after:auto;page-break-after:auto}.bul.kp table.bul-cls td{padding:0 1px}.bul.kp table.bul-cls thead tr{height:150px}.bul.kp table.bul-cls td.r{padding:0 5px 0 1px}}
 `;
 (function(){try{if(document.head&&document.createElement){const st=document.createElement('style');st.textContent=BUL_CSS;document.head.appendChild(st);}}catch(e){}})();
 
-let prType='card';
+let prType='card',prOrient='p';
+function selPrOrient(o,el){prOrient=o;document.querySelectorAll('#pr-orient .etab').forEach(e=>e.classList.remove('active'));el.classList.add('active');}
 function selPrType(t,el){
   prType=t;
+  $('pr-orient').style.display=t==='class'?'':'none';
   document.querySelectorAll('#pr-types .etab').forEach(e=>e.classList.remove('active'));
   el.classList.add('active');
   $('pr-stu-wrap').style.display=t==='card'?'':'none';
@@ -1491,7 +1497,7 @@ function bulHeader(ci,examTitle){
     <div class="bul-banner">كشف الدرجات</div>`;
 }
 
-const KP_R1=21,KP_R2=33;   // سعة الصفحة الأولى (مع الرأسية) وبقية الصفحات، بوحدة صف واحد
+const KP_R1=21,KP_R2=33,KPL_R1=10,KPL_R2=23;   // سعة الصفحة الأولى (مع الرأسية) وبقية الصفحات، بوحدة صف واحد
 function _tw(txt,font){const c=_tw.c||(_tw.c=document.createElement('canvas').getContext('2d'));c.font=font;return c.measureText(String(txt)).width;}
 function buildKashf(ci,exam){
   const subs=getSubs(ci),mt=maxTotal(ci),isE3=exam===3,n=subs.length;
@@ -1505,7 +1511,7 @@ function buildKashf(ci,exam){
   const total=data.length,pass=data.filter(d=>d.res==='p').length,fail=data.filter(d=>d.res==='f').length;
   const rt=t=>`<th><div class="rt">${t}</div></th>`;
   // ===== عرض الأعمدة: عمود الاسم على قدر أطول اسم، والباقي على قدر محتواه =====
-  const F="800 14px Tajawal,'Segoe UI',Arial,sans-serif",W=710;   // عرض الجدول المطبوع بالبكسل (A4 عمودي)
+  const F="800 14px Tajawal,'Segoe UI',Arial,sans-serif",W=prOrient==='l'?1030:710;   // عرض الجدول المطبوع بالبكسل
   const mw=(arr,min)=>Math.max(min||0,...arr.map(t=>_tw(t,F)));
   const nameNeed=Math.ceil(mw(data.map(d=>d.s.name)))+12;
   const wRank=Math.ceil(mw(data.map(d=>d.rank),0))+5,wCall=Math.ceil(mw(data.map(d=>d.s.callNum||'—'),0))+5;
@@ -1550,24 +1556,25 @@ function buildKashf(ci,exam){
   const ncol=n+(isE3?9:5)+3;
   if(!items.length)items.push({html:`<tr><td colspan="${ncol}">لا يوجد طلاب</td></tr>`,w:1});
   // توزيع الصفوف على صفحات A4: الرأسية والعنوان في الصفحة الأولى فقط
-  const pages=[];let cur=[],cw=0,cap=KP_R1;
+  const pages=[];const CAP1=prOrient==='l'?KPL_R1:KP_R1,CAP2=prOrient==='l'?KPL_R2:KP_R2;
+  let cur=[],cw=0,cap=CAP1;
   items.forEach(it=>{
-    if(cur.length&&cw+it.w>cap){pages.push({rs:cur,w:cw,cap});cur=[];cw=0;cap=KP_R2;}
+    if(cur.length&&cw+it.w>cap){pages.push({rs:cur,w:cw,cap});cur=[];cw=0;cap=CAP2;}
     cur.push(it);cw+=it.w;
   });
   pages.push({rs:cur,w:cw,cap});
   const lp=pages[pages.length-1];
-  if(lp.w>lp.cap-2&&lp.rs.length>1){const mv=lp.rs.pop();lp.w-=mv.w;pages.push({rs:[mv],w:mv.w,cap:KP_R2});}   // مساحة للتوقيع
+  if(lp.w>lp.cap-2&&lp.rs.length>1){const mv=lp.rs.pop();lp.w-=mv.w;pages.push({rs:[mv],w:mv.w,cap:CAP2});}   // مساحة للتوقيع
   const info=`<div class="bul-info">
       <div>عدد الطلاب: <b>${total}</b></div>
       ${(pass+fail)?`<div>الناجحون: <b class="ok">${pass}</b></div><div>الراسبون: <b class="no">${fail}</b></div><div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>`:''}
     </div>`;
   const tbl=(rs,withHead)=>`<div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup>${withHead?`<thead>${head}</thead>`:''}<tbody>${rs.map(r=>r.html).join('')}</tbody></table></div>`;
   const sign='<div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>';
-  return pages.map((pg,pi)=>`<div class="bul bulc kp">${pi===0?bulHeader(ci,examTitle)+info:''}${tbl(pg.rs,pi===0)}${pi===pages.length-1?sign:''}<div class="kp-no">صفحة ${pi+1} من ${pages.length}</div></div>`).join('');
+  return pages.map((pg,pi)=>`<div class="bul bulc kp${prOrient==='l'?' kl':''}">${pi===0?bulHeader(ci,examTitle)+info:''}${tbl(pg.rs,pi===0)}${pi===pages.length-1?sign:''}<div class="kp-no">صفحة ${pi+1} من ${pages.length}</div></div>`).join('');
 }
 
-function pageStyleCss(){return prType==='class'?'@page{size:A4 portrait;margin:8mm 8mm 12mm}':'@page{size:A4 portrait;margin:0}@media print{body{padding:8mm 10mm!important;box-sizing:border-box}}';}
+function pageStyleCss(){return prType==='class'?'@page{size:A4 '+(prOrient==='l'?'landscape':'portrait')+';margin:8mm 8mm 12mm}':'@page{size:A4 portrait;margin:0}@media print{body{padding:8mm 10mm!important;box-sizing:border-box}}';}
 function setPageStyle(){
   let st=document.getElementById('pg-style');
   if(!st){st=document.createElement('style');st.id='pg-style';document.head.appendChild(st);}
@@ -1611,8 +1618,8 @@ async function downloadPDF(){
   try{
     if(!window.html2canvas)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     if(!window.jspdf)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-    const isCls=prType==='class',land=false;
-    const hostW=isCls?733:760;
+    const isCls=prType==='class',land=isCls&&prOrient==='l';
+    const hostW=isCls?(land?1062:733):760;
     host=document.createElement('div');
     host.style.cssText='position:absolute;left:-99999px;top:0;background:#fff;width:'+hostW+'px';
     host.innerHTML=buildPrint();
