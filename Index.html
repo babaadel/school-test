@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>منصة مدرستي  - موريتانيا</title>
+<meta name="theme-color" content="#1a3a2a">
+<title>منصة النتائج المدرسية - موريتانيا</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 :root{
@@ -2352,6 +2353,21 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 init();
+// أيقونة التبويب (favicon) من شعار المدرسة نفسه
+(function(){
+  const img=new Image();
+  img.onload=()=>{
+    try{
+      const c=document.createElement('canvas');c.width=c.height=64;
+      const x=c.getContext('2d');x.beginPath();x.arc(32,32,32,0,Math.PI*2);x.clip();x.drawImage(img,0,0,64,64);
+      let l=document.querySelector('link[rel~="icon"]');
+      if(!l){l=document.createElement('link');l.rel='icon';document.head.appendChild(l);}
+      l.type='image/png';l.href=c.toDataURL('image/png');
+      const a=document.createElement('link');a.rel='apple-touch-icon';a.href=LOGO_B64;document.head.appendChild(a);
+    }catch(e){}
+  };
+  img.src=LOGO_B64;
+})();
 // إخفاء شارة الاستضافة التي يحقنها الموقع المستضيف (ليست جزءًا من هذا الملف)
 (function(){
   const isBadge=n=>{
