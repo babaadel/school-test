@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1a3a2a">
-<title>منصة النتائج المدرسية - موريتانيا</title>
+<title>منصة مدرستي  - موريتانيا</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 :root{
@@ -369,7 +369,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     <div class="stu-count" id="stu-count"></div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>رقم النداء</th><th class="r">الاسم الكامل</th><th>الرقم المدرسي</th><th>الجنس</th><th>تعديل</th><th class="admin-only">حذف</th></tr></thead>
+        <thead><tr><th>رقم النداء</th><th class="r">الاسم الكامل</th><th>الرقم المدرسي</th><th>الرقم الوطني</th><th>الجنس</th><th>تعديل</th><th class="admin-only">حذف</th></tr></thead>
         <tbody id="stu-tbody"></tbody>
       </table>
     </div>
@@ -610,6 +610,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     </div>
     <div class="fr">
       <div class="fg"><label>الرقم المدرسي</label><input id="m-schoolnum" placeholder="2024001"></div>
+      <div class="fg"><label>الرقم الوطني</label><input id="m-natnum" inputmode="numeric" placeholder="الرقم الوطني" autocomplete="off"></div>
       <div class="fg"><label>الجنس</label><select id="m-gender"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
     </div>
     <div class="fr"><div class="fg"><label>القسم</label><select id="m-class" onchange="if(!editingStu)fillNextCall()"></select></div></div>
@@ -956,11 +957,13 @@ function openModal(id){
         document.getElementById('m-name').value=s.name||'';
         document.getElementById('m-callnum').value=s.callNum||'';
         document.getElementById('m-schoolnum').value=s.schoolNum||'';
+        document.getElementById('m-natnum').value=s.natNum||'';
         document.getElementById('m-gender').value=s.gender||'ذكر';
       }
     }else{
       document.getElementById('m-name').value='';
       document.getElementById('m-schoolnum').value='';
+      document.getElementById('m-natnum').value='';
       document.getElementById('m-added').textContent='';
       fillNextCall();
       setTimeout(()=>document.getElementById('m-name').focus(),150);
@@ -1123,6 +1126,7 @@ function saveStu(){
   const data={
     callNum:document.getElementById('m-callnum').value.trim(),
     name,schoolNum:document.getElementById('m-schoolnum').value.trim(),
+    natNum:document.getElementById('m-natnum').value.trim(),
     gender:document.getElementById('m-gender').value,
     classIdx:ci
   };
@@ -1144,6 +1148,7 @@ function saveStu(){
   document.getElementById('m-added').textContent='✅ أُضيف: '+rec.name+' (رقم '+(rec.callNum||'—')+')';
   document.getElementById('m-name').value='';
   document.getElementById('m-schoolnum').value='';
+  document.getElementById('m-natnum').value='';
   fillNextCall();
   document.getElementById('m-name').focus();
 }
@@ -1179,10 +1184,10 @@ function renderStuTable(){
   const gc=genderCounts(list),scEl=document.getElementById('stu-count');
   if(scEl)scEl.innerHTML=`<span class="badge bp">ذكور ${gc.m}</span> <span class="badge" style="background:#fce7f3;color:#9d174d">إناث ${gc.f}</span> <span class="badge" style="background:#e5e7eb;color:#374151">المجموع ${gc.t}</span>`;
   const tb=document.getElementById('stu-tbody');
-  if(!list.length){tb.innerHTML=`<tr><td colspan="6" class="empty">لا يوجد طلاب</td></tr>`;return;}
+  if(!list.length){tb.innerHTML=`<tr><td colspan="7" class="empty">لا يوجد طلاب</td></tr>`;return;}
   tb.innerHTML=list.map(s=>`<tr>
     <td>${s.callNum||'—'}</td><td class="r">${s.name}</td>
-    <td>${s.schoolNum||'—'}</td><td>${s.gender}</td>
+    <td>${esc(s.schoolNum||'—')}</td><td>${esc(s.natNum||'—')}</td><td>${s.gender}</td>
     <td>${canEdit(s.classIdx)?`<button class="btn btn-blue btn-sm" onclick="editStu(${s.id})">✏️</button>`:'—'}</td>
     <td class="admin-only"><button class="btn btn-red btn-sm" onclick="deleteStu(${s.id})">🗑️</button></td>
   </tr>`).join('');
