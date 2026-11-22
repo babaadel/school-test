@@ -380,8 +380,10 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
   <div class="card">
     <div class="shdr">
       <div class="sh-t">📝 إدخال الدرجات</div>
-      <button class="btn btn-green btn-sm" id="btn-save-grades" onclick="saveGrades()">💾 حفظ</button>
+      <div style="display:flex;gap:6px"><button class="btn btn-sm" id="btn-close-exam" style="display:none;background:#fee2e2;color:#991b1b" onclick="toggleExamClosed()">🔒 إغلاق الامتحان</button>
+      <button class="btn btn-green btn-sm" id="btn-save-grades" onclick="saveGrades()">💾 حفظ</button></div>
     </div>
+    <div id="exam-closed-note" style="display:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;margin-bottom:8px">🔒 هذا الامتحان مغلق، الدرجات للعرض فقط.</div>
     <div class="etabs" id="exam-tabs">
       <div class="etab active" onclick="selExam(1,this)">الامتحان الأول</div>
       <div class="etab" onclick="selExam(2,this)">الامتحان الثاني</div>
@@ -609,8 +611,13 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <div class="fg"><label>الاسم الكامل</label><input id="m-name" placeholder="الاسم الكامل"></div>
     </div>
     <div class="fr">
+      <div class="fg"><label>الاسم بالفرنسية (Nom en français)</label><input id="m-namefr" dir="ltr" lang="fr" autocapitalize="words" placeholder="Nom et prénom"></div>
+    </div>
+    <div class="fr">
       <div class="fg"><label>الرقم المدرسي</label><input id="m-schoolnum" placeholder="2024001"></div>
-      <div class="fg"><label>الرقم الوطني</label><input id="m-natnum" inputmode="numeric" placeholder="الرقم الوطني" autocomplete="off"></div>
+      <div class="fg"><label>الرقم الوطني</label><input id="m-stunni" inputmode="numeric" placeholder="الرقم الوطني"></div>
+    </div>
+    <div class="fr">
       <div class="fg"><label>الجنس</label><select id="m-gender"><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
     </div>
     <div class="fr"><div class="fg"><label>القسم</label><select id="m-class" onchange="if(!editingStu)fillNextCall()"></select></div></div>
@@ -716,7 +723,7 @@ let curSC=0,curGC=0,curEx=1,curRkC=0,curRkEx=1,curPrC=0,curPrEx=1;
 let saveTimer=null;
 
 // ============ JSONBIN SYNC (دمج آمن لعدة مستخدمين) ============
-const ADMIN_KEYS=['school','year','district','region','regLine','distLine','motto','classes','staff','students','auth','schedule','satt','archive','dirPhone'];
+const ADMIN_KEYS=['school','year','district','region','regLine','distLine','motto','classes','staff','students','auth','schedule','satt','archive','dirPhone','examClosed'];
 function newDirty(){return {year:false,admin:false,g:{},att:{},login:{},loginSet:{},stu:{}};}
 let dirty=newDirty(),saving=false,againSave=false;
 function hasDirty(d){return d.admin||d.year||Object.keys(d.g).length>0||Object.keys(d.att).length>0||Object.keys(d.login).length>0||Object.keys(d.stu).length>0;}
@@ -770,7 +777,7 @@ async function fetchLatest(){
   const c=new AbortController();const to=setTimeout(()=>c.abort(),8000);
   try{
     const r=await fetch(BIN_URL+'/latest',{headers:{'X-Master-Key':API_KEY,'X-Bin-Meta':false},signal:c.signal});
-    if(!r.ok)throw new Error('load failed');
+    if(!r.ok)throw new Error('HTTP '+r.status);
     return await r.json();
   }finally{clearTimeout(to);}
 }
@@ -782,6 +789,7 @@ async function loadFromCloud(){
     setSyncStatus('ok');
     return true;
   }catch(e){
+    window.lastSyncErr=(e&&e.name==='AbortError')?'انتهت المهلة':(e&&e.message)||'';
     setSyncStatus('err');
     try{const d=localStorage.getItem('mr_school_v4');if(d)S=JSON.parse(d);}catch(e2){}
     return false;
@@ -831,7 +839,7 @@ async function pullLatest(manual){
 function setSyncStatus(status){
   const el=document.getElementById('sync-status');
   if(status==='ok'){el.className='sync-indicator sync-ok';el.textContent='☁️ متزامن';}
-  else if(status==='err'){el.className='sync-indicator sync-err';el.textContent='⚠️ غير متزامن';}
+  else if(status==='err'){el.className='sync-indicator sync-err';el.textContent='⚠️ غير متزامن'+(window.lastSyncErr?' ('+window.lastSyncErr+')':'');}
   else{el.className='sync-indicator sync-loading';el.textContent='⏳ جاري المزامنة...';}
 }
 function sv(noAdmin){
@@ -848,6 +856,7 @@ function normalizeState(){
   if(!S.grades)S.grades={};
   if(!S.att)S.att={};
   if(!S.satt)S.satt={};
+  if(!S.examClosed||typeof S.examClosed!=='object')S.examClosed={};
   if(!S.archive||typeof S.archive!=='object')S.archive={};
   if(S.regLine===undefined)S.regLine='الإدارة الجهوية بولاية لعصابة';
   if(S.distLine===undefined)S.distLine='مفتشية التعليم بمقاطعة كنكوصة';
@@ -957,13 +966,15 @@ function openModal(id){
         document.getElementById('m-name').value=s.name||'';
         document.getElementById('m-callnum').value=s.callNum||'';
         document.getElementById('m-schoolnum').value=s.schoolNum||'';
-        document.getElementById('m-natnum').value=s.natNum||'';
+        document.getElementById('m-stunni').value=s.nni||'';
+        document.getElementById('m-namefr').value=s.nameFr||'';
         document.getElementById('m-gender').value=s.gender||'ذكر';
       }
     }else{
       document.getElementById('m-name').value='';
       document.getElementById('m-schoolnum').value='';
-      document.getElementById('m-natnum').value='';
+      document.getElementById('m-stunni').value='';
+      document.getElementById('m-namefr').value='';
       document.getElementById('m-added').textContent='';
       fillNextCall();
       setTimeout(()=>document.getElementById('m-name').focus(),150);
@@ -1113,9 +1124,11 @@ function renderStaff(){
 }
 
 // ============ STUDENTS ============
+function canFrNames(){if(isAdmin)return true;const m=meObj();return !!m&&(m.lang==='فرنسي'||m.lang==='مزدوج');}
+function applyFrLock(){const e=document.getElementById('m-namefr');if(!e)return;const ok=canFrNames();e.readOnly=!ok;e.style.opacity=ok?'':'.6';e.placeholder=ok?'Nom et prénom':'🔒 لمعلمي الفرنسية فقط';}
 function addStuClick(){
   if(!canEdit(curSC)){showToast('⚠️ يمكنك الإضافة في الأقسام المسندة إليك فقط');return;}
-  editingStu=null;openModal('modal-student');
+  editingStu=null;openModal('modal-student');applyFrLock();
 }
 function saveStu(){
   const name=document.getElementById('m-name').value.trim();
@@ -1126,7 +1139,8 @@ function saveStu(){
   const data={
     callNum:document.getElementById('m-callnum').value.trim(),
     name,schoolNum:document.getElementById('m-schoolnum').value.trim(),
-    natNum:document.getElementById('m-natnum').value.trim(),
+    nni:document.getElementById('m-stunni').value.trim(),
+    nameFr:document.getElementById('m-namefr').value.trim(),
     gender:document.getElementById('m-gender').value,
     classIdx:ci
   };
@@ -1148,7 +1162,8 @@ function saveStu(){
   document.getElementById('m-added').textContent='✅ أُضيف: '+rec.name+' (رقم '+(rec.callNum||'—')+')';
   document.getElementById('m-name').value='';
   document.getElementById('m-schoolnum').value='';
-  document.getElementById('m-natnum').value='';
+  document.getElementById('m-stunni').value='';
+  document.getElementById('m-namefr').value='';
   fillNextCall();
   document.getElementById('m-name').focus();
 }
@@ -1158,7 +1173,7 @@ function fillNextCall(){
   document.getElementById('m-callnum').value=(nums.length?Math.max(...nums):0)+1;
 }
 document.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&['m-name','m-schoolnum','m-callnum'].includes(document.activeElement&&document.activeElement.id)&&!editingStu){e.preventDefault();saveStu();}
+  if(e.key==='Enter'&&['m-name','m-schoolnum','m-stunni','m-callnum'].includes(document.activeElement&&document.activeElement.id)&&!editingStu){e.preventDefault();saveStu();}
 });
 let editingStu=null;
 function editStu(id){
@@ -1187,7 +1202,7 @@ function renderStuTable(){
   if(!list.length){tb.innerHTML=`<tr><td colspan="7" class="empty">لا يوجد طلاب</td></tr>`;return;}
   tb.innerHTML=list.map(s=>`<tr>
     <td>${s.callNum||'—'}</td><td class="r">${s.name}</td>
-    <td>${esc(s.schoolNum||'—')}</td><td>${esc(s.natNum||'—')}</td><td>${s.gender}</td>
+    <td>${s.schoolNum||'—'}</td><td>${esc(s.nni||'—')}</td><td>${s.gender}</td>
     <td>${canEdit(s.classIdx)?`<button class="btn btn-blue btn-sm" onclick="editStu(${s.id})">✏️</button>`:'—'}</td>
     <td class="admin-only"><button class="btn btn-red btn-sm" onclick="deleteStu(${s.id})">🗑️</button></td>
   </tr>`).join('');
@@ -1198,6 +1213,7 @@ function selExam(n,el){curEx=n;document.querySelectorAll('#exam-tabs .etab').for
 function setG(id,ex,sub,val){
   const stu=(S.students||[]).find(x=>x.id===id);
   if(!stu||!canEdit(stu.classIdx))return;
+  if(S.examClosed&&S.examClosed[ex]){showToast('🔒 هذا الامتحان مغلق');return;}
   if(!S.grades)S.grades={};
   if(!S.grades[id])S.grades[id]={};
   if(!S.grades[id][ex])S.grades[id][ex]={};
@@ -1222,9 +1238,29 @@ function calcYearAvg(id,ci){
 function grCls(v){v=parseFloat(v);if(v>=14)return'gg';if(v>=10)return'gok';if(v>=8)return'gw';return'gf';}
 function saveGrades(){sv();renderGrades();updateStats();}
 
+function examIsClosed(n){return !!(S.examClosed&&S.examClosed[n]);}
+function toggleExamClosed(){
+  if(!isAdmin){showToast('⚠️ الإغلاق للمدير فقط');return;}
+  if(!S.examClosed)S.examClosed={};
+  const n=curEx,nm=['','الأول','الثاني','الثالث'][n];
+  if(examIsClosed(n)){
+    if(!confirm('فتح الامتحان '+nm+' من جديد للتعديل؟'))return;
+    delete S.examClosed[n];
+  }else{
+    if(!confirm('إغلاق الامتحان '+nm+'؟ لن يستطيع أحد تعديل درجاته حتى تعيد فتحه.'))return;
+    S.examClosed[n]=true;
+  }
+  dirty.admin=true;sv(true);
+  renderGrades();
+}
 function renderGrades(){
   const wrap=document.getElementById('grades-wrap');
-  const sbtn=document.getElementById('btn-save-grades');if(sbtn)sbtn.style.display=canEdit(curGC)?'':'none';
+  const cb=document.getElementById('btn-close-exam');
+  if(cb){cb.style.display=isAdmin?'':'none';cb.textContent=examIsClosed(curEx)?'🔓 فتح الامتحان':'🔒 إغلاق الامتحان';}
+  document.querySelectorAll('#exam-tabs .etab').forEach((e,i)=>{e.textContent=['الامتحان الأول','الامتحان الثاني','الامتحان الثالث'][i]+(examIsClosed(i+1)?' 🔒':'');});
+  const cbn=document.getElementById('exam-closed-note');
+  if(cbn)cbn.style.display=examIsClosed(curEx)?'block':'none';
+  const sbtn=document.getElementById('btn-save-grades');if(sbtn)sbtn.style.display=(canEdit(curGC)&&!examIsClosed(curEx))?'':'none';
   const stus=getStuByClass(curGC);
   const subs=getSubs(curGC);
   if(!stus.length){wrap.innerHTML='<div class="empty">لا يوجد طلاب</div>';return;}
@@ -1242,7 +1278,7 @@ function renderGrades(){
     const absent=((S.grades||{})[stu.id]||{})[curEx]?.['_absent']||'';
     const inputs=subs.map(s=>`<td><input class="gi" type="number" min="0" max="${s.coeff[curGC]}" step="0.5"
       value="${g[s.name]!==undefined?g[s.name]:''}"
-      ${canEdit(curGC)?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
+      ${(canEdit(curGC)&&!examIsClosed(curEx))?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
     const tot=calcTotal(stu.id,curEx,curGC);
     const avg=calcAvg(stu.id,curEx,curGC);
     let extra='';
@@ -1254,7 +1290,7 @@ function renderGrades(){
              <td class="avg-cell ${grCls(yr)}" id="yr-${stu.id}">${yr}</td>`;
     }
     return`<tr id="row-${stu.id}">
-      <td>${stu.callNum||'—'}</td><td class="r">${stu.name}</td>
+      <td>${stu.callNum||'—'}</td><td class="r">${stu.name}${(stu.nameFr&&canFrNames())?`<br><small dir="ltr" style="color:#2563eb;font-weight:700">${esc(stu.nameFr)}</small>`:''}</td>
       ${inputs}
       <td class="total-cell" id="tot-${stu.id}">${tot}</td>
       <td class="avg-cell ${grCls(avg)}" id="avg-${stu.id}">${avg}</td>
@@ -1342,6 +1378,7 @@ const BUL_CSS=`
 .bul.kp{display:flex;flex-direction:column;position:relative;padding-bottom:11mm}
 .bul.kp .kp-no{position:absolute;left:0;right:0;bottom:3mm;text-align:center;font-size:13px;font-weight:800;direction:rtl}
 .bul.kp .bul-wrap{flex:none}
+@media print{.bul.kp.kfull .bul-wrap{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}.bul.kp.kfull table.bul-cls{height:100%}.bul.kp.kfull table.bul-cls tbody tr{height:auto}}
 .bul.kp .bul-sign{margin-top:auto;padding-top:8px;min-height:0}
 .bul.kp table.bul-cls{min-width:0}
 .bul.kp table.bul-cls thead tr{height:150px}
@@ -1377,6 +1414,7 @@ function getMen(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._men||'';}
 function setMen(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
   if(!stu||!canEdit(stu.classIdx))return false;
+  if(S.examClosed&&S.examClosed[ex])return false;
   v=String(v||'').trim();
   if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
   if(v)S.grades[id][ex]._men=v;else delete S.grades[id][ex]._men;
@@ -1387,6 +1425,7 @@ function getRes(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._res||'';}
 function setRes(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
   if(!stu||!canEdit(stu.classIdx))return false;
+  if(S.examClosed&&S.examClosed[ex])return false;
   if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
   if(v)S.grades[id][ex]._res=v;else delete S.grades[id][ex]._res;
   markG(id,ex,'_res',v||'');return true;
@@ -1527,7 +1566,7 @@ function bulHeader(ci,examTitle){
     <div class="bul-banner">كشف الدرجات</div>`;
 }
 
-const KP_R1=21,KP_R2=33,KPL_R1=10,KPL_R2=23;   // سعة الصفحة الأولى (مع الرأسية) وبقية الصفحات، بوحدة صف واحد
+const KP_R1=21,KP_R2=35,KPL_R1=10,KPL_R2=23;   // سعة الصفحة الأولى (مع الرأسية) وبقية الصفحات، بوحدة صف واحد
 function _tw(txt,font){const c=_tw.c||(_tw.c=document.createElement('canvas').getContext('2d'));c.font=font;return c.measureText(String(txt)).width;}
 function buildKashf(ci,exam){
   const subs=getSubs(ci),mt=maxTotal(ci),isE3=exam===3,n=subs.length;
@@ -1602,7 +1641,7 @@ function buildKashf(ci,exam){
     </div>`;
   const tbl=(rs,withHead)=>`<div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup>${withHead?`<thead>${head}</thead>`:''}<tbody>${rs.map(r=>r.html).join('')}</tbody></table></div>`;
   const sign='<div class="bul-sign"><div>المعلم / المعلمة:</div><div>المدير:</div></div>';
-  return pages.map((pg,pi)=>`<div class="bul bulc kp${prOrient==='l'?' kl':''}">${pi===0?bulHeader(ci,examTitle)+info:''}${tbl(pg.rs,pi===0)}${pi===pages.length-1?sign:''}<div class="kp-no">صفحة ${pi+1} من ${pages.length}</div></div>`).join('');
+  return pages.map((pg,pi)=>`<div class="bul bulc kp${prOrient==='l'?' kl':''}${pi<pages.length-1?' kfull':''}">${pi===0?bulHeader(ci,examTitle)+info:''}${tbl(pg.rs,pi===0)}${pi===pages.length-1?sign:''}<div class="kp-no">صفحة ${pi+1} من ${pages.length}</div></div>`).join('');
 }
 
 function pageStyleCss(){return prType==='class'?'@page{size:A4 '+(prOrient==='l'?'landscape':'portrait')+';margin:8mm 8mm 12mm}':'@page{size:A4 portrait;margin:0}@media print{body{padding:8mm 10mm!important;box-sizing:border-box}}';}
