@@ -1,1 +1,8 @@
-
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "dev.pages.madrassety.twa",
+    "sha256_cert_fingerprints": ["C3:D2:6D:3E:F5:50:EA:71:E6:1B:EC:5A:CC:42:34:64:25:B9:2C:C8:6C:D2:15:EE:9D:CD:5E:5F:05:6F:3E:E3"]
+  }
+}]
