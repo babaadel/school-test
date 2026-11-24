@@ -1297,7 +1297,7 @@ function renderSetup(){
   for(let i=0;i<6;i++)
     h+=`<div class="fr" style="margin-bottom:6px">
       <div class="fg" style="max-width:28px;flex:none;padding-top:22px;text-align:center;font-weight:800;color:var(--gm)">${i+1}</div>
-      <div class="fg"><label>القسم ${i+1}</label><input id="cls-${i}" value="${S.classes[i]||''}"></div>
+      <div class="fg"><label>القسم ${i+1}</label><input id="cls-${i}" value="${esc(S.classes[i]||'')}"></div>
     </div>`;
   document.getElementById('classes-setup').innerHTML=h;
 }
@@ -1332,7 +1332,7 @@ function mkAllCtabs(){
 }
 function mk(cid,cb,active){
   const el=document.getElementById(cid);
-  el.innerHTML=S.classes.map((c,i)=>`<button class="ctab ${i===active?'active':''}">${c}</button>`).join('');
+  el.innerHTML=S.classes.map((c,i)=>`<button class="ctab ${i===active?'active':''}">${esc(c)}</button>`).join('');
   el.querySelectorAll('.ctab').forEach((b,i)=>{
     b.onclick=()=>{el.querySelectorAll('.ctab').forEach(x=>x.classList.remove('active'));b.classList.add('active');cb(i);};
   });
@@ -1657,8 +1657,8 @@ function renderStuTable(){
   const tb=document.getElementById('stu-tbody');
   if(!list.length){tb.innerHTML=`<tr><td colspan="7" class="empty">لا يوجد طلاب</td></tr>`;return;}
   tb.innerHTML=list.map(s=>`<tr>
-    <td>${s.callNum||'—'}</td><td class="r">${s.name}</td>
-    <td>${s.schoolNum||'—'}</td><td>${esc(s.nni||'—')}</td><td>${s.gender}</td>
+    <td>${esc(s.callNum||'—')}</td><td class="r">${esc(s.name)}</td>
+    <td>${esc(s.schoolNum||'—')}</td><td>${esc(s.nni||'—')}</td><td>${esc(s.gender)}</td>
     <td>${canEdit(s.classIdx)?`<button class="btn btn-blue btn-sm" onclick="editStu(${s.id})">✏️</button>`:'—'}</td>
     <td class="admin-only"><button class="btn btn-red btn-sm" onclick="deleteStu(${s.id})">🗑️</button></td>
   </tr>`).join('');
@@ -1748,7 +1748,7 @@ function renderGrades(){
              <td class="avg-cell ${grCls(yr)}" id="yr-${stu.id}">${yr}</td>`;
     }
     return`<tr id="row-${stu.id}">
-      <td>${stu.callNum||'—'}</td><td class="r">${stu.name}${(stu.nameFr&&canFrNames())?`<br><small dir="ltr" style="color:#2563eb;font-weight:700">${esc(stu.nameFr)}</small>`:''}</td>
+      <td>${esc(stu.callNum||'—')}</td><td class="r">${esc(stu.name)}${(stu.nameFr&&canFrNames())?`<br><small dir="ltr" style="color:#2563eb;font-weight:700">${esc(stu.nameFr)}</small>`:''}</td>
       ${inputs}
       <td class="total-cell" id="tot-${stu.id}">${tot}</td>
       <td class="avg-cell ${grCls(avg)}" id="avg-${stu.id}">${avg}</td>
@@ -1790,8 +1790,8 @@ function renderRanking(){
     const rc=i===0?'r1':i===1?'r2':i===2?'r3':'ro';
     return`<div class="rrow">
       <div class="rnk ${rc}">${i<3?medals[i]:i+1}</div>
-      <div style="flex:1"><div style="font-weight:700;font-size:13px">${s.name}</div>
-      <div style="font-size:10px;color:var(--gray)">رقم النداء: ${s.callNum||'—'}</div></div>
+      <div style="flex:1"><div style="font-weight:700;font-size:13px">${esc(s.name)}</div>
+      <div style="font-size:10px;color:var(--gray)">رقم النداء: ${esc(s.callNum||'—')}</div></div>
       <span class="badge ${pass?'bp':'bf'}">${pass?'ناجح':'راسب'}</span>
       <span style="font-size:17px;font-weight:800;color:${pass?'var(--gm)':'var(--red)'};margin-right:8px">${s.avg}</span>
     </div>`;
