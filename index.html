@@ -618,7 +618,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <div class="fg"><label>اسم المستخدم</label><input id="m-suser" autocomplete="off"></div>
       <div class="fg"><label>كلمة المرور</label><input id="m-spass" type="password" placeholder="اتركها فارغة للإبقاء" autocomplete="new-password"></div>
     </div>
-    <div style="font-size:11px;color:var(--gray);line-height:1.8">بهذا الحساب يدخل صاحبه ويدوّن درجات وغياب أقسامه فقط، أما «مدير المدرسة» فله نفس صلاحيات المشرف. اترك اسم المستخدم فارغاً لإلغاء الحساب.</div>
+    <div style="font-size:11px;color:var(--gray);line-height:1.8">بهذا الحساب يدخل صاحبه ويدوّن درجات وغياب أقسامه فقط. أما «مدير المدرسة» فله صلاحيات المشرف في الإدارة، لكن الدرجات يدوّنها المعلم المسنَد إليه القسم وحده. اترك اسم المستخدم فارغاً لإلغاء الحساب.</div>
     <div class="modal-footer">
       <button class="btn btn-green" style="flex:1" onclick="saveStaff()">✅ حفظ</button>
       <button class="btn" style="flex:1;background:#f3f4f6" onclick="closeModal('modal-staff')">إلغاء</button>
@@ -1668,7 +1668,8 @@ function renderStuTable(){
 function selExam(n,el){curEx=n;document.querySelectorAll('#exam-tabs .etab').forEach(e=>e.classList.remove('active'));el.classList.add('active');renderGrades();}
 function setG(id,ex,sub,val){
   const stu=(S.students||[]).find(x=>x.id===id);
-  if(!stu||!canEdit(stu.classIdx))return;
+  if(!stu||viewingYear)return;
+  if(!canGrade(stu.classIdx)){showToast('⚠️ الدرجات يدوّنها المعلم المسنَد إليه القسم فقط');return;}
   if(S.examClosed&&S.examClosed[ex]){showToast('🔒 هذا الامتحان مغلق');return;}
   if(!S.grades)S.grades={};
   if(!S.grades[id])S.grades[id]={};
@@ -1718,7 +1719,7 @@ function renderGrades(){
   document.querySelectorAll('#exam-tabs .etab').forEach((e,i)=>{e.textContent=['الامتحان الأول','الامتحان الثاني','الامتحان الثالث'][i]+(examIsClosed(i+1)?' 🔒':'');});
   const cbn=document.getElementById('exam-closed-note');
   if(cbn)cbn.style.display=examIsClosed(curEx)?'block':'none';
-  const sbtn=document.getElementById('btn-save-grades');if(sbtn)sbtn.style.display=(canEdit(curGC)&&!examIsClosed(curEx))?'':'none';
+  const sbtn=document.getElementById('btn-save-grades');if(sbtn)sbtn.style.display=(canGrade(curGC)&&!examIsClosed(curEx))?'':'none';
   const stus=getStuByClass(curGC);
   const subs=getSubs(curGC);
   if(!stus.length){wrap.innerHTML='<div class="empty">لا يوجد طلاب</div>';return;}
@@ -1736,7 +1737,7 @@ function renderGrades(){
     const absent=((S.grades||{})[stu.id]||{})[curEx]?.['_absent']||'';
     const inputs=subs.map(s=>`<td><input class="gi" type="number" min="0" max="${s.coeff[curGC]}" step="0.5"
       value="${g[s.name]!==undefined?g[s.name]:''}"
-      ${(canEdit(curGC)&&!examIsClosed(curEx))?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
+      ${(canGrade(curGC)&&!examIsClosed(curEx))?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
     const tot=calcTotal(stu.id,curEx,curGC);
     const avg=calcAvg(stu.id,curEx,curGC);
     let extra='';
@@ -1756,7 +1757,12 @@ function renderGrades(){
       <td>${absTotal(stu.id,curGC)||'—'}</td>
     </tr>`;
   }).join('');
-  wrap.innerHTML=`<table><thead>${th}</thead><tbody>${rows}</tbody></table>`;
+  let gnote='';
+  if(!viewingYear&&!canGrade(curGC)){
+    const tn=(S.staff||[]).filter(s=>(s.classIdxs||[]).includes(curGC)).map(s=>esc(s.name)).join('، ');
+    gnote=`<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;text-align:center">👁️ عرض فقط — يدوّن الدرجات المعلم المسنَد إليه هذا القسم${tn?' ('+tn+')':''}</div>`;
+  }
+  wrap.innerHTML=gnote+`<table><thead>${th}</thead><tbody>${rows}</tbody></table>`;
 }
 
 function liveUpdate(id){
@@ -1871,7 +1877,7 @@ const RESL={p:'ناجح',f:'راسب',w:'مزيد من العمل'},RESC={p:'ok'
 function getMen(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._men||'';}
 function setMen(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
-  if(!stu||!canEdit(stu.classIdx))return false;
+  if(!stu||!canGrade(stu.classIdx))return false;
   if(S.examClosed&&S.examClosed[ex])return false;
   v=String(v||'').trim();
   if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
@@ -1883,7 +1889,7 @@ function pickMen(id,v){setMen(id,curPrEx,v);sv();}
 function getRes(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._res||'';}
 function setRes(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
-  if(!stu||!canEdit(stu.classIdx))return false;
+  if(!stu||!canGrade(stu.classIdx))return false;
   if(S.examClosed&&S.examClosed[ex])return false;
   if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
   const old=S.grades[id][ex]._res;
@@ -1903,7 +1909,7 @@ function resAuto(){
 function resClear(){getStuByClass(curPrC).forEach(st=>{setRes(st.id,curPrEx,'');setMen(st.id,curPrEx,'');});sv();renderResSel();}
 function renderResSel(){
   const box=$('res-list');if(!box)return;
-  const stus=getStuByClass(curPrC),ok=canEdit(curPrC);
+  const stus=getStuByClass(curPrC),ok=canGrade(curPrC);
   const np=stus.filter(x=>getRes(x.id,curPrEx)==='p').length,nf=stus.filter(x=>getRes(x.id,curPrEx)==='f').length,nw=stus.filter(x=>getRes(x.id,curPrEx)==='w').length;
   const sm=$('res-sum');if(sm)sm.textContent=(np+nf+nw)?('— ناجح '+np+' • راسب '+nf+(nw?' • مزيد من العمل '+nw:'')):'— فارغ';
   const tools=$('res-tools');if(tools)tools.style.display=ok&&stus.length?'':'none';
@@ -2441,6 +2447,8 @@ function isDirRec(st){return !!st&&st.role==='مدير المدرسة';}
 function meObj(){return role==='teacher'?(S.staff||[]).find(s=>s.id===meId):null;}
 function myClasses(){const m=meObj();return m?(m.classIdxs||[]):[];}
 function canEdit(ci){if(viewingYear)return false;return isAdmin||(role==='teacher'&&myClasses().includes(ci));}
+// الدرجات والنتيجة والتقدير: للمعلم المسنَد إليه القسم وحده، حتى المدير والمشرف (الإدارة تبقى لهما، والتصحيح يكون بإسناد القسم إليهما)
+function canGrade(ci){if(viewingYear)return false;return role==='teacher'&&myClasses().includes(ci);}
 function setSession(r,id,h){try{localStorage.setItem(SESSION_KEY,JSON.stringify({r,id,h}));}catch(e){}}
 function getSession(){try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(e){return null;}}
 
