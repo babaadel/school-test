@@ -443,6 +443,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
       <div class="etab active" onclick="selPrExam(1,this)">الامتحان الأول</div>
       <div class="etab" onclick="selPrExam(2,this)">الامتحان الثاني</div>
       <div class="etab" onclick="selPrExam(3,this)">الامتحان الثالث</div>
+      <div class="etab" id="pr-ex-an" style="display:none" onclick="selPrExam(4,this)">المعدل السنوي</div>
     </div>
     <div class="etabs" id="pr-orient" style="display:none">
       <div class="etab active" onclick="selPrOrient('p',this)">📄 طباعة عمودية</div>
@@ -452,7 +453,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--gm);flex-shrink:0}
     <div class="fg" id="pr-stu-wrap" style="margin-top:8px"><label>الطالب</label><select id="pr-stu"></select></div>
     <details class="res-box" id="res-box">
       <summary>✅ عمود النتيجة <small id="res-sum"></small></summary>
-      <div style="font-size:12px;color:#666;margin:6px 0">اختياري: يبقى عمود النتيجة فارغاً حتى تختار «ناجح» أو «راسب» لكل تلميذ. (يُطبَّق على الكشف الفردي وكشف القسم)</div>
+      <div style="font-size:12px;color:#666;margin:6px 0">اختياري: يبقى عمود النتيجة فارغاً حتى تختار «ناجح» أو «راسب» لكل تلميذ. (يُطبَّق على الكشف الفردي وكشف القسم). نتيجة الامتحان الثالث والمعدل السنوي واحدة، وهي نتيجة نهاية السنة.</div>
       <div class="btn-group" id="res-tools"><button class="btn btn-blue btn-sm" onclick="resAuto()">⚡ تعبئة حسب المعدل</button><button class="btn btn-sm" style="background:#e5e7eb" onclick="resClear()">🧹 تفريغ الكل</button></div>
       <div id="res-list"></div>
     </details>
@@ -1864,6 +1865,8 @@ function selPrType(t,el){
   document.querySelectorAll('#pr-types .etab').forEach(e=>e.classList.remove('active'));
   el.classList.add('active');
   $('pr-stu-wrap').style.display=t==='card'?'':'none';
+  const an=$('pr-ex-an');if(an)an.style.display=t==='class'?'':'none';
+  if(t!=='class'&&curPrEx===4){const e3=document.querySelectorAll('#pr-exams .etab')[2];if(e3)selPrExam(3,e3);}
 }
 function fillPrStu(){
   const sel=$('pr-stu');if(!sel)return;
@@ -1885,7 +1888,8 @@ function setMen(id,ex,v){
   if(v)S.grades[id][ex]._men=v;else delete S.grades[id][ex]._men;
   markG(id,ex,'_men',v);logGrade(stu,ex,'_men',old,v);return true;
 }
-function pickMen(id,v){setMen(id,curPrEx,v);sv();}
+function rxOf(){return curPrEx===4?3:curPrEx;}   // نتيجة المعدل السنوي = نتيجة الامتحان الثالث (نهاية السنة)
+function pickMen(id,v){setMen(id,rxOf(),v);sv();}
 function getRes(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._res||'';}
 function setRes(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
@@ -1896,31 +1900,32 @@ function setRes(id,ex,v){
   if(v)S.grades[id][ex]._res=v;else delete S.grades[id][ex]._res;
   markG(id,ex,'_res',v||'');logGrade(stu,ex,'_res',old,v||'');return true;
 }
-function pickRes(id,v){const cur=getRes(id,curPrEx),nr=cur===v?'':v;setRes(id,curPrEx,nr);if(nr!=='p')setMen(id,curPrEx,'');sv();renderResSel();}
+function pickRes(id,v){const rx=rxOf(),cur=getRes(id,rx),nr=cur===v?'':v;setRes(id,rx,nr);if(nr!=='p')setMen(id,rx,'');sv();renderResSel();}
 function resAuto(){
   let n=0;
   getStuByClass(curPrC).forEach(st=>{
-    if(!hasGr(st.id,curPrEx))return;
-    const f=parseFloat(curPrEx===3?calcYearAvg(st.id,curPrC):calcAvg(st.id,curPrEx,curPrC));
-    if(setRes(st.id,curPrEx,f>=10?'p':'f'))n++;
+    if(!(curPrEx===4?hasAnn(st.id):hasGr(st.id,curPrEx)))return;
+    const f=parseFloat(curPrEx>=3?calcYearAvg(st.id,curPrC):calcAvg(st.id,curPrEx,curPrC));
+    if(setRes(st.id,rxOf(),f>=10?'p':'f'))n++;
   });
   sv();renderResSel();showToast(n?'✅ تمت التعبئة حسب المعدل، يمكنك تعديل أي تلميذ':'⚠️ لا توجد درجات أو لا تملك صلاحية هذا القسم');
 }
-function resClear(){getStuByClass(curPrC).forEach(st=>{setRes(st.id,curPrEx,'');setMen(st.id,curPrEx,'');});sv();renderResSel();}
+function resClear(){const rx=rxOf();getStuByClass(curPrC).forEach(st=>{setRes(st.id,rx,'');setMen(st.id,rx,'');});sv();renderResSel();}
 function renderResSel(){
   const box=$('res-list');if(!box)return;
   const stus=getStuByClass(curPrC),ok=canGrade(curPrC);
-  const np=stus.filter(x=>getRes(x.id,curPrEx)==='p').length,nf=stus.filter(x=>getRes(x.id,curPrEx)==='f').length,nw=stus.filter(x=>getRes(x.id,curPrEx)==='w').length;
+  const rx=rxOf(),np=stus.filter(x=>getRes(x.id,rx)==='p').length,nf=stus.filter(x=>getRes(x.id,rx)==='f').length,nw=stus.filter(x=>getRes(x.id,rx)==='w').length;
   const sm=$('res-sum');if(sm)sm.textContent=(np+nf+nw)?('— ناجح '+np+' • راسب '+nf+(nw?' • مزيد من العمل '+nw:'')):'— فارغ';
   const tools=$('res-tools');if(tools)tools.style.display=ok&&stus.length?'':'none';
-  box.innerHTML=ok?'<datalist id="men-list"><option value="ممتاز"><option value="جيد جدا"><option value="جيد"><option value="حسن"><option value="مقبول"></datalist>'+stus.map(x=>{const r=getRes(x.id,curPrEx);
+  box.innerHTML=ok?'<datalist id="men-list"><option value="ممتاز"><option value="جيد جدا"><option value="جيد"><option value="حسن"><option value="مقبول"></datalist>'+stus.map(x=>{const r=getRes(x.id,rx);
     return `<div class="att-row"><div class="att-name"><b>${esc(x.callNum||'—')}</b> ${esc(x.name)}</div><div class="att-btns">
       <button class="att-b ok ${r==='p'?'on':''}" onclick="pickRes(${x.id},'p')">ناجح</button>
       <button class="att-b wa ${r==='w'?'on':''}" onclick="pickRes(${x.id},'w')">مزيد من العمل</button>
       <button class="att-b no ${r==='f'?'on':''}" onclick="pickRes(${x.id},'f')">راسب</button></div>
-      ${r==='p'?`<div class="men-wrap"><label>التقدير:</label><input class="men-in" list="men-list" placeholder="اكتب أو اختر (ممتاز، جيد جدا...)" value="${esc(getMen(x.id,curPrEx))}" onchange="pickMen(${x.id},this.value)"></div>`:''}</div>`;}).join('')
+      ${r==='p'?`<div class="men-wrap"><label>التقدير:</label><input class="men-in" list="men-list" placeholder="اكتب أو اختر (ممتاز، جيد جدا...)" value="${esc(getMen(x.id,rx))}" onchange="pickMen(${x.id},this.value)"></div>`:''}</div>`;}).join('')
     :'<div class="empty">🔒 هذا القسم ليس من أقسامك</div>';
 }
+function hasAnn(id){return hasGr(id,1)||hasGr(id,2)||hasGr(id,3);}
 function hasGr(id,ex){
   const g=((S.grades||{})[id]||{})[ex]||{};
   return Object.keys(g).some(k=>k!=='_absent'&&k!=='_res'&&k!=='_men'&&g[k]!==undefined&&g[k]!==''&&g[k]!==null);
@@ -2035,12 +2040,14 @@ function bulHeader(ci,examTitle){
 const KP_R1=21,KP_R2=35,KPL_R1=10,KPL_R2=23;   // سعة الصفحة الأولى (مع الرأسية) وبقية الصفحات، بوحدة صف واحد
 function _tw(txt,font){const c=_tw.c||(_tw.c=document.createElement('canvas').getContext('2d'));c.font=font;return c.measureText(String(txt)).width;}
 function buildKashf(ci,exam){
-  const subs=getSubs(ci),mt=maxTotal(ci),isE3=exam===3,n=subs.length;
+  // exam 1..3: كشف الامتحان (مواد + مجموع + معدل)، exam 4: كشف المعدل السنوي (معدلات الامتحانات الثلاثة والمعدل العام)
+  const isAn=exam===4,rx=isAn?3:exam;
+  const subs=isAn?[]:getSubs(ci),mt=maxTotal(ci),n=subs.length;
   const stus=getStuByClass(ci);
   const f2=v=>parseFloat(v).toFixed(2).replace('.',',');
   const cls=v=>v>=10?'ok':'no';
-  const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':'امتحان الفصل الأخير';
-  const data=stus.map(s=>({s,has:hasGr(s.id,exam),fin:parseFloat(isE3?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci)),res:getRes(s.id,exam)}));
+  const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':exam===3?'امتحان الفصل الأخير':'المعدل السنوي';
+  const data=stus.map(s=>({s,has:isAn?hasAnn(s.id):hasGr(s.id,exam),fin:parseFloat(isAn?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci)),res:getRes(s.id,rx)}));
   data.forEach(d=>{d.rank=1+data.filter(o=>o.fin>d.fin).length;});
   data.sort((a,b)=>a.rank-b.rank||parseFloat(a.s.callNum||0)-parseFloat(b.s.callNum||0));
   const total=data.length,pass=data.filter(d=>d.res==='p').length,fail=data.filter(d=>d.res==='f').length,work=data.filter(d=>d.res==='w').length,gc=genderCounts(stus);
@@ -2053,9 +2060,9 @@ function buildKashf(ci,exam){
   const wSnum=Math.ceil(mw(data.map(d=>d.s.schoolNum||'—'),0))+5;
   const wSub=subs.map(sb=>Math.max(22,Math.ceil(mw(data.map(d=>((((S.grades||{})[d.s.id]||{})[exam]||{})[sb.name])??'—'),0))+4));
   const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(_tw('00,00',F))+5;
-  const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,exam);return m?['ناجح',m]:['ناجح'];}if(d.res==='f')return ['راسب'];if(d.res==='w')return ['مزيد من','العمل'];return [];};
+  const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,rx);return m?['ناجح',m]:['ناجح'];}if(d.res==='f')return ['راسب'];if(d.res==='w')return ['مزيد من','العمل'];return [];};
   const wRes=Math.ceil(Math.min(90,Math.max(_tw('ناجح',F),_tw('راسب',F),...data.flatMap(resLines).map(t=>_tw(t,F)))))+5;
-  const others=[Math.max(18,wRank),Math.max(18,wCall),Math.max(40,wSnum),...wSub,wTot,wAvg,...(isE3?[wAvg,wAvg,wAvg,wAvg]:[]),wRes];
+  const others=[Math.max(18,wRank),Math.max(18,wCall),Math.max(40,wSnum),...wSub,...(isAn?[wAvg,wAvg,wAvg,wAvg]:[wTot,wAvg]),wRes];
   const oSum=others.reduce((a,b)=>a+b,0);
   let nameW,scale=1;
   if(nameNeed+oSum<=W){const extra=W-nameNeed-oSum;nameW=nameNeed;scale=1+extra/oSum;}
@@ -2064,12 +2071,11 @@ function buildKashf(ci,exam){
   const col=x=>`<col style="width:${x}%">`;
   const wc=[...others];
   const cols=col(pc(wc[0]))+col(pc(wc[1]))+col((nameW/W*100).toFixed(3))+col(pc(wc[2]))
-    +subs.map((_,k)=>col(pc(wc[3+k]))).join('')
-    +col(pc(wc[3+n]))+col(pc(wc[4+n]))+(isE3?col(pc(wc[5+n]))+col(pc(wc[6+n]))+col(pc(wc[7+n]))+col(pc(wc[8+n])):'')+col(pc(wc[wc.length-1]));
+    +wc.slice(3).map(w=>col(pc(w))).join('');
   const head=`<tr>${rt('الرتبة')}${rt('رقم النداء')}<th>الاسم الكامل</th>${rt('الرقم المدرسي')}
     ${subs.map(sb=>rt(esc(sb.name)+' / '+sb.coeff[ci])).join('')}
-    ${rt('المجموع / '+mt)}${rt('المعدل / 20')}
-    ${isE3?rt('معدل ف١')+rt('معدل ف٢')+rt('معدل ف٣')+rt('المعدل العام'):''}
+    ${isAn?'':rt('المجموع / '+mt)+rt('المعدل / 20')}
+    ${isAn?rt('معدل الامتحان الأول')+rt('معدل الامتحان الثاني')+rt('معدل الامتحان الثالث')+rt('المعدل العام'):''}
     ${rt('النتيجة')}</tr>`;
   const items=data.map(d=>{
     const s=d.s,g=((S.grades||{})[s.id]||{})[exam]||{};
@@ -2082,14 +2088,14 @@ function buildKashf(ci,exam){
       <td class="r${nl>1?' w':''}">${esc(s.name)}</td>
       <td>${esc(s.schoolNum||'—')}</td>
       ${subs.map(sb=>`<td>${g[sb.name]!==undefined&&g[sb.name]!==''?esc(g[sb.name]):'—'}</td>`).join('')}
-      <td>${d.has?`<span class="v">${calcTotal(s.id,exam,ci)}</span>`:'—'}</td>
-      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>
-      ${isE3?`<td>${exA(1)}</td><td>${exA(2)}</td><td>${exA(3)}</td><td>${d.has?`<span class="v ${cls(d.fin)}">${f2(d.fin)}</span>`:'—'}</td>`:''}
+      ${isAn?'':`<td>${d.has?`<span class="v">${calcTotal(s.id,exam,ci)}</span>`:'—'}</td>
+      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>`}
+      ${isAn?`<td>${exA(1)}</td><td>${exA(2)}</td><td>${exA(3)}</td><td>${d.has?`<span class="v ${cls(d.fin)}">${f2(d.fin)}</span>`:'—'}</td>`:''}
       <td class="${RESC[d.res]||''}">${resLines(d).map(esc).join('<br>')}</td>
     </tr>`;
     return {html,w:lines===1?1:1+0.4*(lines-1)};
   });
-  const ncol=n+(isE3?9:5)+3;
+  const ncol=isAn?9:n+8;
   if(!items.length)items.push({html:`<tr><td colspan="${ncol}">لا يوجد طلاب</td></tr>`,w:1});
   // توزيع الصفوف على صفحات A4: الرأسية والعنوان في الصفحة الأولى فقط
   const pages=[];const CAP1=prOrient==='l'?KPL_R1:KP_R1,CAP2=prOrient==='l'?KPL_R2:KP_R2;
@@ -2126,7 +2132,7 @@ function closeKashf(){document.getElementById('print-overlay').style.display='no
 
 function downloadHTML(){
   const body=buildPrint();
-  const examLbl=curPrEx===1?'الاول':curPrEx===2?'الثاني':'الاخير';
+  const examLbl=curPrEx===1?'الاول':curPrEx===2?'الثاني':curPrEx===3?'الاخير':'المعدل_السنوي';
   const cls=S.classes[curPrC].replace(/ /g,'_');
   const doc=`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>كشف ${esc(S.classes[curPrC])}</title><style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap');
@@ -2194,7 +2200,7 @@ async function downloadPDF(){
         pdf.addImage(c.toDataURL('image/jpeg',.92),'JPEG',m+(w-ww)/2,m,ww,hh);
       }
     }
-    const examLbl=curPrEx===1?'الاول':curPrEx===2?'الثاني':'الاخير';
+    const examLbl=curPrEx===1?'الاول':curPrEx===2?'الثاني':curPrEx===3?'الاخير':'المعدل_السنوي';
     pdf.save('كشف_'+S.classes[curPrC].replace(/ /g,'_')+'_'+examLbl+'.pdf');
     showToast('✅ تم تحميل ملف PDF');
   }catch(e){showToast('⚠️ '+(e&&e.message?e.message:'تعذر إنشاء PDF'));}
