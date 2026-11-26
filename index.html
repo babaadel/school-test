@@ -1991,8 +1991,7 @@ function buildBulletin(stu,ci,exam,rank,pgend){
   const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':'امتحان الفصل الأخير';
   const cls=v=>v>=10?'ok':'no';
   const exAvg=e=>{
-    if(isExAbs(stu.id,e))return '<span class="v no">غائب</span>';
-    if(!hasGr(stu.id,e))return '<span class="v">—</span>';
+    if(isExAbs(stu.id,e)||!hasGr(stu.id,e))return '<span class="v">—</span>';
     const a=parseFloat(calcAvg(stu.id,e,ci));
     return `<span class="v ${cls(a)}">${f2(a)}\\20</span>`;
   };
@@ -2012,13 +2011,13 @@ function buildBulletin(stu,ci,exam,rank,pgend){
       c2=`<td><span class="v">${v!==undefined&&v!==''?esc(v)+'\\'+sb.coeff[ci]:'—'}</span></td>`;
     }else if(r===n+1){
       c1='<td class="sub">المجموع</td>';
-      c2=`<td>${abx?'<span class="v no">غائب</span>':`<span class="v">${has?calcTotal(stu.id,exam,ci)+'\\'+mt:'—'}</span>`}</td>`;
+      c2=`<td><span class="v">${has?calcTotal(stu.id,exam,ci)+'\\'+mt:'—'}</span></td>`;
     }else{
       c1='<td class="sub">المعدل</td>';
       c2=`<td><span class="v ${has?cls(avg):''}">${has?f2(avg)+'\\20':'—'}</span></td>`;
     }
     let c3='',c4='';
-    const remark=`${abx?'<div class="res no">غائب عن الامتحان</div>':''}${resV?`<div class="res ${RESC[resV]}">${RESL[resV]}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${(resV||abx)?8:0}px">${absTxt}</div>`:''}`;
+    const remark=`${resV?`<div class="res ${RESC[resV]}">${RESL[resV]}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${resV?8:0}px">${absTxt}</div>`:''}`;
     if(isE3){
       if(r===0)c3='<th>معدل الامتحان الأول</th>';
       else if(r===1)c3=`<td rowspan="${sz[0]}">${exAvg(1)}</td>`;
@@ -2089,7 +2088,6 @@ function buildKashf(ci,exam){
   const data=stus.map(s=>({s,abs:!isAn&&isExAbs(s.id,exam),has:isAn?hasAnn(s.id):(hasGr(s.id,exam)&&!isExAbs(s.id,exam)),fin:parseFloat(isAn?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci)),res:getRes(s.id,rx)}));
   data.forEach(d=>{d.rank=1+data.filter(o=>o.fin>d.fin).length;});
   data.sort((a,b)=>a.rank-b.rank||parseFloat(a.s.callNum||0)-parseFloat(b.s.callNum||0));
-  const nAbs=data.filter(d=>d.abs).length;
   const total=data.length,pass=data.filter(d=>d.res==='p').length,fail=data.filter(d=>d.res==='f').length,work=data.filter(d=>d.res==='w').length,gc=genderCounts(stus);
   const rt=t=>`<th><div class="rt">${t}</div></th>`;
   // ===== عرض الأعمدة: عمود الاسم على قدر أطول اسم، والباقي على قدر محتواه =====
@@ -2099,7 +2097,7 @@ function buildKashf(ci,exam){
   const wRank=Math.ceil(mw(data.map(d=>d.rank),0))+5,wCall=Math.ceil(mw(data.map(d=>d.s.callNum||'—'),0))+5;
   const wSnum=Math.ceil(mw(data.map(d=>d.s.schoolNum||'—'),0))+5;
   const wSub=subs.map(sb=>Math.max(22,Math.ceil(mw(data.map(d=>d.abs?'—':((((S.grades||{})[d.s.id]||{})[exam]||{})[sb.name])??'—'),0))+4));
-  const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(Math.max(_tw('00,00',F),_tw('غائب',F)))+5;
+  const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(_tw('00,00',F))+5;
   const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,rx);return m?['ناجح',m]:['ناجح'];}if(d.res==='f')return ['راسب'];if(d.res==='w')return ['مزيد من','العمل'];return [];};
   const wRes=Math.ceil(Math.min(90,Math.max(_tw('ناجح',F),_tw('راسب',F),...data.flatMap(resLines).map(t=>_tw(t,F)))))+5;
   const others=[Math.max(18,wRank),Math.max(18,wCall),Math.max(40,wSnum),...wSub,...(isAn?[wAvg,wAvg,wAvg,wAvg]:[wTot,wAvg]),wRes];
@@ -2120,16 +2118,16 @@ function buildKashf(ci,exam){
   const items=data.map(d=>{
     const s=d.s,g=((S.grades||{})[s.id]||{})[exam]||{};
     const avg=parseFloat(calcAvg(s.id,exam,ci));
-    const exA=e=>isExAbs(s.id,e)?'<span class="v no">غائب</span>':hasGr(s.id,e)?`<span class="v ${cls(parseFloat(calcAvg(s.id,e,ci)))}">${f2(calcAvg(s.id,e,ci))}</span>`:'—';
+    const exA=e=>(!isExAbs(s.id,e)&&hasGr(s.id,e))?`<span class="v ${cls(parseFloat(calcAvg(s.id,e,ci)))}">${f2(calcAvg(s.id,e,ci))}</span>`:'—';
     const nl=Math.max(1,Math.ceil((_tw(s.name,F)+12)/nameW)),lines=Math.max(nl,resLines(d).length);
     const html=`<tr${lines>1?' class="wr"':''}>
       <td>${d.has?`<span class="v">${d.rank}</span>`:'—'}</td>
       <td>${esc(s.callNum||'—')}</td>
       <td class="r${nl>1?' w':''}">${esc(s.name)}</td>
       <td>${esc(s.schoolNum||'—')}</td>
-      ${d.abs?`<td colspan="${n+2}" class="no">غائب عن الامتحان</td>`:`${subs.map(sb=>`<td>${g[sb.name]!==undefined&&g[sb.name]!==''?esc(g[sb.name]):'—'}</td>`).join('')}
+      ${subs.map(sb=>`<td>${(!d.abs&&g[sb.name]!==undefined&&g[sb.name]!=='')?esc(g[sb.name]):'—'}</td>`).join('')}
       ${isAn?'':`<td>${d.has?`<span class="v">${calcTotal(s.id,exam,ci)}</span>`:'—'}</td>
-      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>`}`}
+      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>`}
       ${isAn?`<td>${exA(1)}</td><td>${exA(2)}</td><td>${exA(3)}</td><td>${d.has?`<span class="v ${cls(d.fin)}">${f2(d.fin)}</span>`:'—'}</td>`:''}
       <td class="${RESC[d.res]||''}">${resLines(d).map(esc).join('<br>')}</td>
     </tr>`;
@@ -2149,7 +2147,6 @@ function buildKashf(ci,exam){
   if(lp.w>lp.cap-2&&lp.rs.length>1){const mv=lp.rs.pop();lp.w-=mv.w;pages.push({rs:[mv],w:mv.w,cap:CAP2});}   // مساحة للتوقيع
   const info=`<div class="bul-info">
       <div>عدد الطلاب: <b>${total}</b></div><div>ذكور: <b>${gc.m}</b></div><div>إناث: <b>${gc.f}</b></div>
-      ${nAbs?`<div>الغائبون عن الامتحان: <b class="no">${nAbs}</b></div>`:''}
       ${(pass+fail+work)?`<div>الناجحون: <b class="ok">${pass}</b></div><div>الراسبون: <b class="no">${fail}</b></div>${work?`<div>مزيد من العمل: <b class="wk">${work}</b></div>`:''}<div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>`:''}
     </div>`;
   const tbl=(rs,withHead)=>`<div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup>${withHead?`<thead>${head}</thead>`:''}<tbody>${rs.map(r=>r.html).join('')}</tbody></table></div>`;
