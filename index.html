@@ -100,6 +100,11 @@ tr:nth-child(even) td{background:#f9fffe}
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .bp{background:#d1fae5;color:#065f46}.bf{background:#fee2e2;color:#991b1b}
 .total-cell{background:#fff9e6;font-weight:800}
+.abs-btn{min-width:46px;min-height:34px;padding:3px 8px;border:1.5px dashed #94a3b8;border-radius:8px;background:#fff;color:#334155;font:inherit;font-weight:700;cursor:pointer}
+.abs-btn.on{background:#fee2e2;border:1.5px solid #dc2626;color:#b91c1c}
+.abs-btn small{display:block;font-size:10px;font-weight:600;opacity:.85}
+.abs-chip{display:inline-block;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:2px 8px;font-weight:800;font-size:12px}
+tr.abs-row td{background:#fff5f5}
 .avg-cell{background:#e8f5e9;font-weight:800}
 th.total-cell{background:#fde68a;color:#1a3a2a}
 th.avg-cell{background:#b7e4c7;color:#1a3a2a}
@@ -895,8 +900,8 @@ function logLine(it){
   const cn=(S.classes||[])[it.c]||'';
   if(it.k==='__lock')return {who:(it.v==='مغلق'?'🔒 إغلاق':'🔓 فتح')+' الامتحان '+exn,what:'',chg:''};
   if(it.k==='__del')return {who:it.n||'—',what:'🗑️ حذف التلميذ من '+(cn||'القسم'),chg:''};
-  const lab=it.k==='_res'?'النتيجة':(it.k==='_men'?'التقدير':it.k);
-  const fv=x=>{if(x===''||x===null||x===undefined)return '—';return it.k==='_res'?(RESL[x]||x):x;};
+  const lab=it.k==='_res'?'النتيجة':(it.k==='_men'?'التقدير':(it.k==='_absent'?'الغياب عن الامتحان':it.k));
+  const fv=x=>{if(it.k==='_absent')return (x===''||x===null||x===undefined)?'حاضر':'غائب';if(x===''||x===null||x===undefined)return '—';return it.k==='_res'?(RESL[x]||x):x;};
   return {who:it.n||'—',what:lab+' — الامتحان '+exn,chg:'<span style="color:#b91c1c">'+esc(fv(it.o))+'</span> ← <b style="color:#166534">'+esc(fv(it.v))+'</b>'};
 }
 function renderLog(){
@@ -1672,6 +1677,7 @@ function setG(id,ex,sub,val){
   if(!stu||viewingYear)return;
   if(!canGrade(stu.classIdx)){showToast('⚠️ الدرجات يدوّنها المعلم المسنَد إليه القسم فقط');return;}
   if(S.examClosed&&S.examClosed[ex]){showToast('🔒 هذا الامتحان مغلق');return;}
+  if(isExAbs(id,ex)){showToast('🚫 التلميذ مسجّل غائبًا عن هذا الامتحان — ألغِ «غائب» أولًا');return;}
   if(!S.grades)S.grades={};
   if(!S.grades[id])S.grades[id]={};
   if(!S.grades[id][ex])S.grades[id][ex]={};
@@ -1685,7 +1691,24 @@ function setG(id,ex,sub,val){
     S.grades[id][ex][sub]=v;markG(id,ex,sub,v);logGrade(stu,ex,sub,old,v);
   }
 }
+// غائب عن الامتحان (لم يمتحن): علامة _absent تُسجَّل بالضغط على خانة «الغياب» في جدول الدرجات
+function isExAbs(id,ex){return !!((((S.grades||{})[id]||{})[ex]||{})._absent);}
+function toggleExAbs(id){
+  const stu=(S.students||[]).find(x=>x.id===id);
+  if(!stu||viewingYear)return;
+  if(!canGrade(stu.classIdx)){showToast('⚠️ الدرجات يدوّنها المعلم المسنَد إليه القسم فقط');return;}
+  const ex=curEx;
+  if(examIsClosed(ex)){showToast('🔒 هذا الامتحان مغلق');return;}
+  const was=isExAbs(id,ex);
+  if(!was&&hasGr(id,ex)&&!confirm('«'+stu.name+'» له درجات مدوّنة في هذا الامتحان.\nتسجيله غائبًا يُخفي درجاته (لا تُحذف) ويعود إليها إن ألغيت الغياب.\nمتابعة؟'))return;
+  if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
+  if(was)delete S.grades[id][ex]._absent;else S.grades[id][ex]._absent=1;
+  markG(id,ex,'_absent',was?'':1);logGrade(stu,ex,'_absent',was?1:'',was?'':1);
+  gradeRowRefresh(id);sv();updateStats();
+  showToast(was?'↩️ أُلغي الغياب':'🚫 سُجّل غائبًا عن الامتحان');
+}
 function calcTotal(id,ex,ci){
+  if(isExAbs(id,ex))return 0;   // الغائب يُحسب صفرًا (درجاته المدوّنة تبقى محفوظة ومخفية)
   const subs=getSubs(ci);const g=((S.grades||{})[id]||{})[ex]||{};
   return subs.reduce((a,s)=>a+(parseFloat(g[s.name])||0),0);
 }
@@ -1725,6 +1748,7 @@ function renderGrades(){
   const subs=getSubs(curGC);
   if(!stus.length){wrap.innerHTML='<div class="empty">لا يوجد طلاب</div>';return;}
   const isE3=curEx===3;
+  const canG=canGrade(curGC)&&!examIsClosed(curEx);
   let th=`<tr>
     <th>رقم النداء</th><th class="r">الطالب</th>
     ${subs.map(s=>`<th>${s.name}<br><small>/${s.coeff[curGC]}</small></th>`).join('')}
@@ -1733,37 +1757,47 @@ function renderGrades(){
     ${isE3?'<th>م.ف١</th><th>م.ف٢</th><th>م.ف٣</th><th class="avg-cell">المعدل السنوي</th>':''}
     <th>الغياب</th>
   </tr>`;
-  let rows=stus.map(stu=>{
-    const g=((S.grades||{})[stu.id]||{})[curEx]||{};
-    const absent=((S.grades||{})[stu.id]||{})[curEx]?.['_absent']||'';
-    const inputs=subs.map(s=>`<td><input class="gi" type="number" min="0" max="${s.coeff[curGC]}" step="0.5"
-      value="${g[s.name]!==undefined?g[s.name]:''}"
-      ${(canGrade(curGC)&&!examIsClosed(curEx))?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
-    const tot=calcTotal(stu.id,curEx,curGC);
-    const avg=calcAvg(stu.id,curEx,curGC);
-    let extra='';
-    if(isE3){
-      const a1=calcAvg(stu.id,1,curGC),a2=calcAvg(stu.id,2,curGC),a3=calcAvg(stu.id,3,curGC);
-      const yr=calcYearAvg(stu.id,curGC);
-      extra=`<td class="${grCls(a1)}">${a1}</td><td class="${grCls(a2)}">${a2}</td>
-             <td class="${grCls(a3)}">${a3}</td>
-             <td class="avg-cell ${grCls(yr)}" id="yr-${stu.id}">${yr}</td>`;
-    }
-    return`<tr id="row-${stu.id}">
-      <td>${esc(stu.callNum||'—')}</td><td class="r">${esc(stu.name)}${(stu.nameFr&&canFrNames())?`<br><small dir="ltr" style="color:#2563eb;font-weight:700">${esc(stu.nameFr)}</small>`:''}</td>
-      ${inputs}
-      <td class="total-cell" id="tot-${stu.id}">${tot}</td>
-      <td class="avg-cell ${grCls(avg)}" id="avg-${stu.id}">${avg}</td>
-      ${extra}
-      <td>${absTotal(stu.id,curGC)||'—'}</td>
-    </tr>`;
-  }).join('');
+  let rows=stus.map(gradeRowHtml).join('');
   let gnote='';
   if(!viewingYear&&!canGrade(curGC)){
     const tn=(S.staff||[]).filter(s=>(s.classIdxs||[]).includes(curGC)).map(s=>esc(s.name)).join('، ');
     gnote=`<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;text-align:center">👁️ عرض فقط — يدوّن الدرجات المعلم المسنَد إليه هذا القسم${tn?' ('+tn+')':''}</div>`;
   }
+  else if(canG)gnote='<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12px;text-align:center">💡 غاب تلميذ عن الامتحان؟ اضغط خانة «الغياب» في صفّه فيظهر «غائب»</div>';
   wrap.innerHTML=gnote+`<table><thead>${th}</thead><tbody>${rows}</tbody></table>`;
+}
+function gradeRowHtml(stu){
+  const subs=getSubs(curGC),isE3=curEx===3;
+  const g=((S.grades||{})[stu.id]||{})[curEx]||{};
+  const abs=isExAbs(stu.id,curEx),can=canGrade(curGC)&&!examIsClosed(curEx);
+  const inputs=subs.map(s=>`<td><input class="gi" type="number" min="0" max="${s.coeff[curGC]}" step="0.5"
+    value="${(!abs&&g[s.name]!==undefined)?g[s.name]:''}"
+    ${(can&&!abs)?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
+  const tot=abs?'<span class="abs-chip">غائب</span>':calcTotal(stu.id,curEx,curGC);
+  const avg=abs?'—':calcAvg(stu.id,curEx,curGC);
+  let extra='';
+  if(isE3){
+    const ec=e=>isExAbs(stu.id,e)?'<td><span class="abs-chip">غائب</span></td>':`<td class="${grCls(calcAvg(stu.id,e,curGC))}">${calcAvg(stu.id,e,curGC)}</td>`;
+    const yr=calcYearAvg(stu.id,curGC);
+    extra=`${ec(1)}${ec(2)}${ec(3)}<td class="avg-cell ${grCls(yr)}" id="yr-${stu.id}">${yr}</td>`;
+  }
+  const ac=absTotal(stu.id,curGC);
+  const absCell=can
+    ?`<td class="abs-td"><button type="button" class="abs-btn${abs?' on':''}" onclick="toggleExAbs(${stu.id})">${abs?'غائب':(ac||'—')}${(abs&&ac)?`<small>${ac} غياب</small>`:''}</button></td>`
+    :`<td class="abs-td">${abs?'<span class="abs-chip">غائب</span>':(ac||'—')}</td>`;
+  return`<tr id="row-${stu.id}"${abs?' class="abs-row"':''}>
+    <td>${esc(stu.callNum||'—')}</td><td class="r">${esc(stu.name)}${(stu.nameFr&&canFrNames())?`<br><small dir="ltr" style="color:#2563eb;font-weight:700">${esc(stu.nameFr)}</small>`:''}</td>
+    ${inputs}
+    <td class="total-cell" id="tot-${stu.id}">${tot}</td>
+    <td class="avg-cell ${abs?'':grCls(avg)}" id="avg-${stu.id}">${avg}</td>
+    ${extra}
+    ${absCell}
+  </tr>`;
+}
+function gradeRowRefresh(id){
+  const stu=(S.students||[]).find(x=>x.id===id),row=document.getElementById('row-'+id);
+  if(!stu||!row){renderGrades();return;}
+  row.outerHTML=gradeRowHtml(stu);
 }
 
 function liveUpdate(id){
@@ -1794,13 +1828,14 @@ function renderRanking(){
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=withA.map((s,i)=>{
     const pass=parseFloat(s.avg)>=10;
+    const ab=isExAbs(s.id,curRkEx),abOnly=ab&&curRkEx!==3;   // في الامتحان الثالث يبقى المعدل السنوي ويُنبَّه إلى الغياب فقط
     const rc=i===0?'r1':i===1?'r2':i===2?'r3':'ro';
     return`<div class="rrow">
-      <div class="rnk ${rc}">${i<3?medals[i]:i+1}</div>
+      <div class="rnk ${abOnly?'ro':rc}">${abOnly?'—':(i<3?medals[i]:i+1)}</div>
       <div style="flex:1"><div style="font-weight:700;font-size:13px">${esc(s.name)}</div>
-      <div style="font-size:10px;color:var(--gray)">رقم النداء: ${esc(s.callNum||'—')}</div></div>
-      <span class="badge ${pass?'bp':'bf'}">${pass?'ناجح':'راسب'}</span>
-      <span style="font-size:17px;font-weight:800;color:${pass?'var(--gm)':'var(--red)'};margin-right:8px">${s.avg}</span>
+      <div style="font-size:10px;color:var(--gray)">رقم النداء: ${esc(s.callNum||'—')}${ab?' <b style="color:var(--red)">• غائب عن الامتحان</b>':''}</div></div>
+      ${abOnly?'<span class="badge bf">غائب</span>':`<span class="badge ${pass?'bp':'bf'}">${pass?'ناجح':'راسب'}</span>`}
+      <span style="font-size:17px;font-weight:800;color:${abOnly?'var(--gray)':(pass?'var(--gm)':'var(--red)')};margin-right:8px">${abOnly?'—':s.avg}</span>
     </div>`;
   }).join('');
 }
@@ -1905,6 +1940,7 @@ function resAuto(){
   let n=0;
   getStuByClass(curPrC).forEach(st=>{
     if(!(curPrEx===4?hasAnn(st.id):hasGr(st.id,curPrEx)))return;
+    if(curPrEx<3&&isExAbs(st.id,curPrEx))return;   // الغائب عن الامتحان لا تُملأ نتيجته آليًا
     const f=parseFloat(curPrEx>=3?calcYearAvg(st.id,curPrC):calcAvg(st.id,curPrEx,curPrC));
     if(setRes(st.id,rxOf(),f>=10?'p':'f'))n++;
   });
@@ -1945,7 +1981,9 @@ function buildBulletin(stu,ci,exam,rank,pgend){
   const subs=getSubs(ci),n=subs.length,mt=maxTotal(ci);
   const g=((S.grades||{})[stu.id]||{})[exam]||{};
   const f2=v=>parseFloat(v).toFixed(2).replace('.',',');
-  const has=hasGr(stu.id,exam);
+  const abx=isExAbs(stu.id,exam);                 // غائب عن هذا الامتحان
+  const has=hasGr(stu.id,exam)&&!abx;
+  const hasF=exam===3?(hasGr(stu.id,3)||abx):has;   // المعدل العام والرتبة (الامتحان الثالث يضم المعدل السنوي)
   const avg=parseFloat(calcAvg(stu.id,exam,ci));
   const final=exam===3?parseFloat(calcYearAvg(stu.id,ci)):avg;
   const resV=getRes(stu.id,exam);
@@ -1953,6 +1991,7 @@ function buildBulletin(stu,ci,exam,rank,pgend){
   const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':'امتحان الفصل الأخير';
   const cls=v=>v>=10?'ok':'no';
   const exAvg=e=>{
+    if(isExAbs(stu.id,e))return '<span class="v no">غائب</span>';
     if(!hasGr(stu.id,e))return '<span class="v">—</span>';
     const a=parseFloat(calcAvg(stu.id,e,ci));
     return `<span class="v ${cls(a)}">${f2(a)}\\20</span>`;
@@ -1968,18 +2007,18 @@ function buildBulletin(stu,ci,exam,rank,pgend){
     let c1='',c2='';
     if(r===0){c1='<th>المواد</th>';c2='<th>الدرجات</th>';}
     else if(r<=n){
-      const sb=subs[r-1];const v=g[sb.name];
+      const sb=subs[r-1];const v=abx?undefined:g[sb.name];
       c1=`<td class="sub">${esc(sb.name)}</td>`;
       c2=`<td><span class="v">${v!==undefined&&v!==''?esc(v)+'\\'+sb.coeff[ci]:'—'}</span></td>`;
     }else if(r===n+1){
       c1='<td class="sub">المجموع</td>';
-      c2=`<td><span class="v">${has?calcTotal(stu.id,exam,ci)+'\\'+mt:'—'}</span></td>`;
+      c2=`<td>${abx?'<span class="v no">غائب</span>':`<span class="v">${has?calcTotal(stu.id,exam,ci)+'\\'+mt:'—'}</span>`}</td>`;
     }else{
       c1='<td class="sub">المعدل</td>';
       c2=`<td><span class="v ${has?cls(avg):''}">${has?f2(avg)+'\\20':'—'}</span></td>`;
     }
     let c3='',c4='';
-    const remark=`${resV?`<div class="res ${RESC[resV]}">${RESL[resV]}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${resV?8:0}px">${absTxt}</div>`:''}`;
+    const remark=`${abx?'<div class="res no">غائب عن الامتحان</div>':''}${resV?`<div class="res ${RESC[resV]}">${RESL[resV]}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${(resV||abx)?8:0}px">${absTxt}</div>`:''}`;
     if(isE3){
       if(r===0)c3='<th>معدل الامتحان الأول</th>';
       else if(r===1)c3=`<td rowspan="${sz[0]}">${exAvg(1)}</td>`;
@@ -2004,7 +2043,7 @@ function buildBulletin(stu,ci,exam,rank,pgend){
       <div>الرقم المدرسي: <b>${esc(stu.schoolNum||'—')}</b></div>
       <div>رقم النداء: <b>${esc(stu.callNum||'—')}</b></div>
     </div>
-    <div class="bul-rank">${isE3?`<span>المعدل العام: <span class="v">${has?f2(final):'—'}</span></span>`:''}<span>الرتبة: <span class="v">${has?rank:'—'}</span></span></div>
+    <div class="bul-rank">${isE3?`<span>المعدل العام: <span class="v">${hasF?f2(final):'—'}</span></span>`:''}<span>الرتبة: <span class="v">${hasF?rank:'—'}</span></span></div>
     <table>
       <colgroup>${isE3?'<col style="width:27%"><col style="width:18%"><col style="width:24%"><col style="width:31%">':'<col style="width:34%"><col style="width:24%"><col style="width:42%">'}</colgroup>
       ${rows}
@@ -2047,9 +2086,10 @@ function buildKashf(ci,exam){
   const f2=v=>parseFloat(v).toFixed(2).replace('.',',');
   const cls=v=>v>=10?'ok':'no';
   const examTitle=exam===1?'امتحان الفصل الأول':exam===2?'امتحان الفصل الثاني':exam===3?'امتحان الفصل الأخير':'المعدل السنوي';
-  const data=stus.map(s=>({s,has:isAn?hasAnn(s.id):hasGr(s.id,exam),fin:parseFloat(isAn?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci)),res:getRes(s.id,rx)}));
+  const data=stus.map(s=>({s,abs:!isAn&&isExAbs(s.id,exam),has:isAn?hasAnn(s.id):(hasGr(s.id,exam)&&!isExAbs(s.id,exam)),fin:parseFloat(isAn?calcYearAvg(s.id,ci):calcAvg(s.id,exam,ci)),res:getRes(s.id,rx)}));
   data.forEach(d=>{d.rank=1+data.filter(o=>o.fin>d.fin).length;});
   data.sort((a,b)=>a.rank-b.rank||parseFloat(a.s.callNum||0)-parseFloat(b.s.callNum||0));
+  const nAbs=data.filter(d=>d.abs).length;
   const total=data.length,pass=data.filter(d=>d.res==='p').length,fail=data.filter(d=>d.res==='f').length,work=data.filter(d=>d.res==='w').length,gc=genderCounts(stus);
   const rt=t=>`<th><div class="rt">${t}</div></th>`;
   // ===== عرض الأعمدة: عمود الاسم على قدر أطول اسم، والباقي على قدر محتواه =====
@@ -2058,8 +2098,8 @@ function buildKashf(ci,exam){
   const nameNeed=Math.ceil(mw(data.map(d=>d.s.name)))+12;
   const wRank=Math.ceil(mw(data.map(d=>d.rank),0))+5,wCall=Math.ceil(mw(data.map(d=>d.s.callNum||'—'),0))+5;
   const wSnum=Math.ceil(mw(data.map(d=>d.s.schoolNum||'—'),0))+5;
-  const wSub=subs.map(sb=>Math.max(22,Math.ceil(mw(data.map(d=>((((S.grades||{})[d.s.id]||{})[exam]||{})[sb.name])??'—'),0))+4));
-  const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(_tw('00,00',F))+5;
+  const wSub=subs.map(sb=>Math.max(22,Math.ceil(mw(data.map(d=>d.abs?'—':((((S.grades||{})[d.s.id]||{})[exam]||{})[sb.name])??'—'),0))+4));
+  const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(Math.max(_tw('00,00',F),_tw('غائب',F)))+5;
   const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,rx);return m?['ناجح',m]:['ناجح'];}if(d.res==='f')return ['راسب'];if(d.res==='w')return ['مزيد من','العمل'];return [];};
   const wRes=Math.ceil(Math.min(90,Math.max(_tw('ناجح',F),_tw('راسب',F),...data.flatMap(resLines).map(t=>_tw(t,F)))))+5;
   const others=[Math.max(18,wRank),Math.max(18,wCall),Math.max(40,wSnum),...wSub,...(isAn?[wAvg,wAvg,wAvg,wAvg]:[wTot,wAvg]),wRes];
@@ -2080,16 +2120,16 @@ function buildKashf(ci,exam){
   const items=data.map(d=>{
     const s=d.s,g=((S.grades||{})[s.id]||{})[exam]||{};
     const avg=parseFloat(calcAvg(s.id,exam,ci));
-    const exA=e=>hasGr(s.id,e)?`<span class="v ${cls(parseFloat(calcAvg(s.id,e,ci)))}">${f2(calcAvg(s.id,e,ci))}</span>`:'—';
+    const exA=e=>isExAbs(s.id,e)?'<span class="v no">غائب</span>':hasGr(s.id,e)?`<span class="v ${cls(parseFloat(calcAvg(s.id,e,ci)))}">${f2(calcAvg(s.id,e,ci))}</span>`:'—';
     const nl=Math.max(1,Math.ceil((_tw(s.name,F)+12)/nameW)),lines=Math.max(nl,resLines(d).length);
     const html=`<tr${lines>1?' class="wr"':''}>
       <td>${d.has?`<span class="v">${d.rank}</span>`:'—'}</td>
       <td>${esc(s.callNum||'—')}</td>
       <td class="r${nl>1?' w':''}">${esc(s.name)}</td>
       <td>${esc(s.schoolNum||'—')}</td>
-      ${subs.map(sb=>`<td>${g[sb.name]!==undefined&&g[sb.name]!==''?esc(g[sb.name]):'—'}</td>`).join('')}
+      ${d.abs?`<td colspan="${n+2}" class="no">غائب عن الامتحان</td>`:`${subs.map(sb=>`<td>${g[sb.name]!==undefined&&g[sb.name]!==''?esc(g[sb.name]):'—'}</td>`).join('')}
       ${isAn?'':`<td>${d.has?`<span class="v">${calcTotal(s.id,exam,ci)}</span>`:'—'}</td>
-      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>`}
+      <td>${d.has?`<span class="v ${cls(avg)}">${f2(avg)}</span>`:'—'}</td>`}`}
       ${isAn?`<td>${exA(1)}</td><td>${exA(2)}</td><td>${exA(3)}</td><td>${d.has?`<span class="v ${cls(d.fin)}">${f2(d.fin)}</span>`:'—'}</td>`:''}
       <td class="${RESC[d.res]||''}">${resLines(d).map(esc).join('<br>')}</td>
     </tr>`;
@@ -2109,6 +2149,7 @@ function buildKashf(ci,exam){
   if(lp.w>lp.cap-2&&lp.rs.length>1){const mv=lp.rs.pop();lp.w-=mv.w;pages.push({rs:[mv],w:mv.w,cap:CAP2});}   // مساحة للتوقيع
   const info=`<div class="bul-info">
       <div>عدد الطلاب: <b>${total}</b></div><div>ذكور: <b>${gc.m}</b></div><div>إناث: <b>${gc.f}</b></div>
+      ${nAbs?`<div>الغائبون عن الامتحان: <b class="no">${nAbs}</b></div>`:''}
       ${(pass+fail+work)?`<div>الناجحون: <b class="ok">${pass}</b></div><div>الراسبون: <b class="no">${fail}</b></div>${work?`<div>مزيد من العمل: <b class="wk">${work}</b></div>`:''}<div>نسبة النجاح: <b>${total?Math.round(pass/total*100):0}%</b></div>`:''}
     </div>`;
   const tbl=(rs,withHead)=>`<div class="bul-wrap"><table class="bul-cls"><colgroup>${cols}</colgroup>${withHead?`<thead>${head}</thead>`:''}<tbody>${rs.map(r=>r.html).join('')}</tbody></table></div>`;
