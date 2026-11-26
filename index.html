@@ -2897,7 +2897,7 @@ function saveNav(){
   if(typeof role==='undefined'||role==='none'||!S||!S.classes)return;
   try{
     const a=document.querySelector('.page.active');if(!a)return;
-    sessionStorage.setItem(NAV_KEY,JSON.stringify({p:a.id.replace(/^page-/,''),c:[curSC,curGC,curAC,curRkC,curPrC]}));
+    sessionStorage.setItem(NAV_KEY,JSON.stringify({p:a.id.replace(/^page-/,''),c:[curSC,curGC,curAC,curRkC,curPrC],x:[curEx,curRkEx,curPrEx,prType,prOrient]}));
   }catch(e){}
 }
 function restoreNav(){
@@ -2909,6 +2909,14 @@ function restoreNav(){
     const okc=i=>Number.isInteger(i)&&i>=0&&i<S.classes.length&&(isAdmin||role!=='teacher'||myClasses().includes(i));
     const c=Array.isArray(n.c)?n.c:[];
     if(okc(c[0]))curSC=c[0];if(okc(c[1]))curGC=c[1];if(okc(c[2]))curAC=c[2];if(okc(c[3]))curRkC=c[3];if(okc(c[4]))curPrC=c[4];
+    // التبويبات الداخلية: الامتحان في الدرجات والترتيب والكشوف، ونوع الكشف واتجاه الطباعة
+    const x=Array.isArray(n.x)?n.x:[];
+    const pick=(sel,fn,v)=>{const el=document.querySelector(sel);if(el)fn(v,el);};
+    if([1,2,3].includes(x[0]))pick('#exam-tabs .etab[onclick^="selExam('+x[0]+',"]',selExam,x[0]);
+    if([1,2,3].includes(x[1]))pick('#page-ranking .etab[onclick^="selRkExam('+x[1]+',"]',selRkExam,x[1]);
+    if(x[3]==='card'||x[3]==='class')pick('#pr-types .etab[onclick^="selPrType(\''+x[3]+'\',"]',selPrType,x[3]);
+    if([1,2,3].includes(x[2])||(x[2]===4&&prType==='class'))pick('#pr-exams .etab[onclick^="selPrExam('+x[2]+',"]',selPrExam,x[2]);
+    if(x[4]==='p'||x[4]==='l')pick('#pr-orient .etab[onclick^="selPrOrient(\''+x[4]+'\',"]',selPrOrient,x[4]);
     showPage(n.p,tab);
     return true;
   }catch(e){return false;}

@@ -1,5 +1,5 @@
 // Service worker (v2 / Firebase): يفتح التطبيق دون إنترنت. لا يعترض أي طلب إلى Firebase أبداً.
-const V='madrassety-v2-6';
+const V='madrassety-v2-7';
 const CORE=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-maskable-512.png'];
 const CACHE_HOSTS=['www.gstatic.com','fonts.googleapis.com','fonts.gstatic.com','cdnjs.cloudflare.com'];
 self.addEventListener('install',e=>{
