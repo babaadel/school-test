@@ -2602,9 +2602,9 @@ function setRole(r,id){
   if(r==='teacher'&&!isAdmin){
     const mc=myClasses();
     if(mc.length){curSC=curGC=curAC=curRkC=curPrC=mc[0];}
-    showPage('att',$('tab-att'));
+    if(!restoreNav())showPage('att',$('tab-att'));
   }else{
-    showPage('att',$('tab-att'));
+    if(!restoreNav())showPage('att',$('tab-att'));
   }
   updateHdr();
   refreshAll();
@@ -2622,6 +2622,7 @@ async function logout(msg){
   try{const FB=await window.fbReady;if(FB)await FB.Au.signOut(FB.auth);}catch(e){}
   try{localStorage.removeItem(PROF_KEY);localStorage.removeItem('mr_dirty_v1');localStorage.removeItem('mr_school_v4');localStorage.removeItem(LOG_KEY);}catch(e){}
   logQ=[];logRows=null;
+  try{sessionStorage.removeItem(NAV_KEY);}catch(e){}
   dirty=newDirty();inflight=null;PROF=null;
   setRole('none');
   showAuth('login',typeof msg==='string'?msg:'');
@@ -2890,11 +2891,37 @@ function renderSAtt(){
 }
 
 // ============ PAGE NAV ============
+// تذكّر الصفحة والقسم المفتوحين: عند تحديث الصفحة (سحب من الأعلى) تبقى المنصة حيث كان المستخدم بدل العودة إلى الواجهة الأولى
+const NAV_KEY='mr_nav_v1';
+function saveNav(){
+  if(typeof role==='undefined'||role==='none'||!S||!S.classes)return;
+  try{
+    const a=document.querySelector('.page.active');if(!a)return;
+    sessionStorage.setItem(NAV_KEY,JSON.stringify({p:a.id.replace(/^page-/,''),c:[curSC,curGC,curAC,curRkC,curPrC]}));
+  }catch(e){}
+}
+function restoreNav(){
+  try{
+    const n=JSON.parse(sessionStorage.getItem(NAV_KEY)||'null');
+    if(!n||typeof n.p!=='string'||!document.getElementById('page-'+n.p))return false;
+    const tab=document.querySelector('.tab[onclick^="showPage(\''+n.p+'\'"]');
+    if(!tab||(tab.classList.contains('admin-only')&&!isAdmin))return false;
+    const okc=i=>Number.isInteger(i)&&i>=0&&i<S.classes.length&&(isAdmin||role!=='teacher'||myClasses().includes(i));
+    const c=Array.isArray(n.c)?n.c:[];
+    if(okc(c[0]))curSC=c[0];if(okc(c[1]))curGC=c[1];if(okc(c[2]))curAC=c[2];if(okc(c[3]))curRkC=c[3];if(okc(c[4]))curPrC=c[4];
+    showPage(n.p,tab);
+    return true;
+  }catch(e){return false;}
+}
+window.addEventListener('pagehide',saveNav);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveNav();});
+document.addEventListener('click',()=>setTimeout(saveNav,0),true);
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(el)el.classList.add('active');
+  saveNav();
   const tm=document.getElementById('tab-menu');if(tm)tm.classList.toggle('active',MENU_PAGES.includes(name));
   mkAllCtabs();
   setTimeout(()=>{
