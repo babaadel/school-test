@@ -901,7 +901,8 @@ function logLine(it){
   if(it.k==='__lock')return {who:(it.v==='مغلق'?'🔒 إغلاق':'🔓 فتح')+' الامتحان '+exn,what:'',chg:''};
   if(it.k==='__del')return {who:it.n||'—',what:'🗑️ حذف التلميذ من '+(cn||'القسم'),chg:''};
   const lab=it.k==='_res'?'النتيجة':(it.k==='_men'?'التقدير':(it.k==='_absent'?'الغياب عن الامتحان':it.k));
-  const fv=x=>{if(it.k==='_absent')return (x===''||x===null||x===undefined)?'حاضر':'غائب';if(x===''||x===null||x===undefined)return '—';return it.k==='_res'?(RESL[x]||x):x;};
+  const st=(S.students||[]).find(x=>x.id===it.s);
+  const fv=x=>{if(it.k==='_absent')return (x===''||x===null||x===undefined)?wPres(st):wAbs(st);if(x===''||x===null||x===undefined)return '—';return it.k==='_res'?resL(x,st):x;};
   return {who:it.n||'—',what:lab+' — الامتحان '+exn,chg:'<span style="color:#b91c1c">'+esc(fv(it.o))+'</span> ← <b style="color:#166534">'+esc(fv(it.v))+'</b>'};
 }
 function renderLog(){
@@ -1677,7 +1678,7 @@ function setG(id,ex,sub,val){
   if(!stu||viewingYear)return;
   if(!canGrade(stu.classIdx)){showToast('⚠️ الدرجات يدوّنها المعلم المسنَد إليه القسم فقط');return;}
   if(S.examClosed&&S.examClosed[ex]){showToast('🔒 هذا الامتحان مغلق');return;}
-  if(isExAbs(id,ex)){showToast('🚫 التلميذ مسجّل غائبًا عن هذا الامتحان — ألغِ «غائب» أولًا');return;}
+  if(isExAbs(id,ex)){showToast('🚫 '+(isF(stu)?'التلميذة مسجّلة غائبة':'التلميذ مسجّل غائبًا')+' عن هذا الامتحان — ألغِ «'+wAbs(stu)+'» أولًا');return;}
   if(!S.grades)S.grades={};
   if(!S.grades[id])S.grades[id]={};
   if(!S.grades[id][ex])S.grades[id][ex]={};
@@ -1700,12 +1701,13 @@ function toggleExAbs(id){
   const ex=curEx;
   if(examIsClosed(ex)){showToast('🔒 هذا الامتحان مغلق');return;}
   const was=isExAbs(id,ex);
-  if(!was&&hasGr(id,ex)&&!confirm('«'+stu.name+'» له درجات مدوّنة في هذا الامتحان.\nتسجيله غائبًا يُخفي درجاته (لا تُحذف) ويعود إليها إن ألغيت الغياب.\nمتابعة؟'))return;
+  const fm=isF(stu);
+  if(!was&&hasGr(id,ex)&&!confirm('«'+stu.name+'» '+(fm?'لها':'له')+' درجات مدوّنة في هذا الامتحان.\nتسجيل'+(fm?'ها غائبة':'ه غائبًا')+' يُخفي درجات'+(fm?'ها':'ه')+' (لا تُحذف) ويعود إليها إن ألغيت الغياب.\nمتابعة؟'))return;
   if(!S.grades)S.grades={};if(!S.grades[id])S.grades[id]={};if(!S.grades[id][ex])S.grades[id][ex]={};
   if(was)delete S.grades[id][ex]._absent;else S.grades[id][ex]._absent=1;
   markG(id,ex,'_absent',was?'':1);logGrade(stu,ex,'_absent',was?1:'',was?'':1);
   gradeRowRefresh(id);sv();updateStats();
-  showToast(was?'↩️ أُلغي الغياب':'🚫 سُجّل غائبًا عن الامتحان');
+  showToast(was?'↩️ أُلغي الغياب':'🚫 '+(fm?'سُجّلت غائبة':'سُجّل غائبًا')+' عن الامتحان');
 }
 function calcTotal(id,ex,ci){
   if(isExAbs(id,ex))return 0;   // الغائب يُحسب صفرًا (درجاته المدوّنة تبقى محفوظة ومخفية)
@@ -1773,18 +1775,18 @@ function gradeRowHtml(stu){
   const inputs=subs.map(s=>`<td><input class="gi" type="number" min="0" max="${s.coeff[curGC]}" step="0.5"
     value="${(!abs&&g[s.name]!==undefined)?g[s.name]:''}"
     ${(can&&!abs)?'':'disabled'} onchange="setG(${stu.id},${curEx},'${s.name}',this.value);liveUpdate(${stu.id})"></td>`).join('');
-  const tot=abs?'<span class="abs-chip">غائب</span>':calcTotal(stu.id,curEx,curGC);
+  const tot=abs?`<span class="abs-chip">${wAbs(stu)}</span>`:calcTotal(stu.id,curEx,curGC);
   const avg=abs?'—':calcAvg(stu.id,curEx,curGC);
   let extra='';
   if(isE3){
-    const ec=e=>isExAbs(stu.id,e)?'<td><span class="abs-chip">غائب</span></td>':`<td class="${grCls(calcAvg(stu.id,e,curGC))}">${calcAvg(stu.id,e,curGC)}</td>`;
+    const ec=e=>isExAbs(stu.id,e)?`<td><span class="abs-chip">${wAbs(stu)}</span></td>`:`<td class="${grCls(calcAvg(stu.id,e,curGC))}">${calcAvg(stu.id,e,curGC)}</td>`;
     const yr=calcYearAvg(stu.id,curGC);
     extra=`${ec(1)}${ec(2)}${ec(3)}<td class="avg-cell ${grCls(yr)}" id="yr-${stu.id}">${yr}</td>`;
   }
   const ac=absTotal(stu.id,curGC);
   const absCell=can
-    ?`<td class="abs-td"><button type="button" class="abs-btn${abs?' on':''}" onclick="toggleExAbs(${stu.id})">${abs?'غائب':(ac||'—')}${(abs&&ac)?`<small>${ac} غياب</small>`:''}</button></td>`
-    :`<td class="abs-td">${abs?'<span class="abs-chip">غائب</span>':(ac||'—')}</td>`;
+    ?`<td class="abs-td"><button type="button" class="abs-btn${abs?' on':''}" onclick="toggleExAbs(${stu.id})">${abs?wAbs(stu):(ac||'—')}${(abs&&ac)?`<small>${ac} غياب</small>`:''}</button></td>`
+    :`<td class="abs-td">${abs?`<span class="abs-chip">${wAbs(stu)}</span>`:(ac||'—')}</td>`;
   return`<tr id="row-${stu.id}"${abs?' class="abs-row"':''}>
     <td>${esc(stu.callNum||'—')}</td><td class="r">${esc(stu.name)}${(stu.nameFr&&canFrNames())?`<br><small dir="ltr" style="color:#2563eb;font-weight:700">${esc(stu.nameFr)}</small>`:''}</td>
     ${inputs}
@@ -1833,8 +1835,8 @@ function renderRanking(){
     return`<div class="rrow">
       <div class="rnk ${abOnly?'ro':rc}">${abOnly?'—':(i<3?medals[i]:i+1)}</div>
       <div style="flex:1"><div style="font-weight:700;font-size:13px">${esc(s.name)}</div>
-      <div style="font-size:10px;color:var(--gray)">رقم النداء: ${esc(s.callNum||'—')}${ab?' <b style="color:var(--red)">• غائب عن الامتحان</b>':''}</div></div>
-      ${abOnly?'<span class="badge bf">غائب</span>':`<span class="badge ${pass?'bp':'bf'}">${pass?'ناجح':'راسب'}</span>`}
+      <div style="font-size:10px;color:var(--gray)">رقم النداء: ${esc(s.callNum||'—')}${ab?` <b style="color:var(--red)">• ${wAbs(s)} عن الامتحان</b>`:''}</div></div>
+      ${abOnly?`<span class="badge bf">${wAbs(s)}</span>`:`<span class="badge ${pass?'bp':'bf'}">${resL(pass?'p':'f',s)}</span>`}
       <span style="font-size:17px;font-weight:800;color:${abOnly?'var(--gray)':(pass?'var(--gm)':'var(--red)')};margin-right:8px">${abOnly?'—':s.avg}</span>
     </div>`;
   }).join('');
@@ -1912,6 +1914,12 @@ function fillPrStu(){
   renderResSel();
 }
 const RESL={p:'ناجح',f:'راسب',w:'مزيد من العمل'},RESC={p:'ok',f:'no',w:'wk'};
+// مخاطبة التلميذة بالمؤنث (ناجحة، راسبة، غائبة، حاضرة) حسب خانة «الجنس» في بطاقة التلميذ
+const RESLF={p:'ناجحة',f:'راسبة',w:'مزيد من العمل'};
+function isF(st){return !!st&&st.gender==='أنثى';}
+function resL(x,st){return (isF(st)?RESLF:RESL)[x]||x;}
+function wAbs(st){return isF(st)?'غائبة':'غائب';}
+function wPres(st){return isF(st)?'حاضرة':'حاضر';}
 function getMen(id,ex){return (((S.grades||{})[id]||{})[ex]||{})._men||'';}
 function setMen(id,ex,v){
   const stu=(S.students||[]).find(x=>x.id===id);
@@ -1955,9 +1963,9 @@ function renderResSel(){
   const tools=$('res-tools');if(tools)tools.style.display=ok&&stus.length?'':'none';
   box.innerHTML=ok?'<datalist id="men-list"><option value="ممتاز"><option value="جيد جدا"><option value="جيد"><option value="حسن"><option value="مقبول"></datalist>'+stus.map(x=>{const r=getRes(x.id,rx);
     return `<div class="att-row"><div class="att-name"><b>${esc(x.callNum||'—')}</b> ${esc(x.name)}</div><div class="att-btns">
-      <button class="att-b ok ${r==='p'?'on':''}" onclick="pickRes(${x.id},'p')">ناجح</button>
+      <button class="att-b ok ${r==='p'?'on':''}" onclick="pickRes(${x.id},'p')">${resL('p',x)}</button>
       <button class="att-b wa ${r==='w'?'on':''}" onclick="pickRes(${x.id},'w')">مزيد من العمل</button>
-      <button class="att-b no ${r==='f'?'on':''}" onclick="pickRes(${x.id},'f')">راسب</button></div>
+      <button class="att-b no ${r==='f'?'on':''}" onclick="pickRes(${x.id},'f')">${resL('f',x)}</button></div>
       ${r==='p'?`<div class="men-wrap"><label>التقدير:</label><input class="men-in" list="men-list" placeholder="اكتب أو اختر (ممتاز، جيد جدا...)" value="${esc(getMen(x.id,rx))}" onchange="pickMen(${x.id},this.value)"></div>`:''}</div>`;}).join('')
     :'<div class="empty">🔒 هذا القسم ليس من أقسامك</div>';
 }
@@ -2017,7 +2025,7 @@ function buildBulletin(stu,ci,exam,rank,pgend){
       c2=`<td><span class="v ${has?cls(avg):''}">${has?f2(avg)+'\\20':'—'}</span></td>`;
     }
     let c3='',c4='';
-    const remark=`${resV?`<div class="res ${RESC[resV]}">${RESL[resV]}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${resV?8:0}px">${absTxt}</div>`:''}`;
+    const remark=`${resV?`<div class="res ${RESC[resV]}">${resL(resV,stu)}</div>${resV==='p'&&getMen(stu.id,exam)?`<div class="res" style="font-size:12px;margin-top:2px">بتقدير: ${esc(getMen(stu.id,exam))}</div>`:''}`:''}${absTxt?`<div style="font-size:14px;font-weight:800;margin-top:${resV?8:0}px">${absTxt}</div>`:''}`;
     if(isE3){
       if(r===0)c3='<th>معدل الامتحان الأول</th>';
       else if(r===1)c3=`<td rowspan="${sz[0]}">${exAvg(1)}</td>`;
@@ -2098,8 +2106,8 @@ function buildKashf(ci,exam){
   const wSnum=Math.ceil(mw(data.map(d=>d.s.schoolNum||'—'),0))+5;
   const wSub=subs.map(sb=>Math.max(22,Math.ceil(mw(data.map(d=>d.abs?'—':((((S.grades||{})[d.s.id]||{})[exam]||{})[sb.name])??'—'),0))+4));
   const wTot=Math.max(26,Math.ceil(mw(data.map(d=>calcTotal(d.s.id,exam,ci)),0))+5),wAvg=Math.ceil(_tw('00,00',F))+5;
-  const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,rx);return m?['ناجح',m]:['ناجح'];}if(d.res==='f')return ['راسب'];if(d.res==='w')return ['مزيد من','العمل'];return [];};
-  const wRes=Math.ceil(Math.min(90,Math.max(_tw('ناجح',F),_tw('راسب',F),...data.flatMap(resLines).map(t=>_tw(t,F)))))+5;
+  const resLines=d=>{if(d.res==='p'){const m=getMen(d.s.id,rx);return m?[resL('p',d.s),m]:[resL('p',d.s)];}if(d.res==='f')return [resL('f',d.s)];if(d.res==='w')return ['مزيد من','العمل'];return [];};
+  const wRes=Math.ceil(Math.min(90,Math.max(_tw('ناجح',F),_tw('راسب',F),_tw('ناجحة',F),_tw('راسبة',F),...data.flatMap(resLines).map(t=>_tw(t,F)))))+5;
   const others=[Math.max(18,wRank),Math.max(18,wCall),Math.max(40,wSnum),...wSub,...(isAn?[wAvg,wAvg,wAvg,wAvg]:[wTot,wAvg]),wRes];
   const oSum=others.reduce((a,b)=>a+b,0);
   let nameW,scale=1;
@@ -2873,7 +2881,7 @@ function renderAtt(){
   wrap.innerHTML=stus.map(s=>{
     const cur=nv(day[s.id]);const t=attTotals(ci,s.id);
     return `<div class="att-row"><div class="att-name"><b>${esc(s.callNum||'—')}</b> ${esc(s.name)}<div class="att-sub">مجموع الغياب: ${t.a}</div></div>
-      <div class="att-btns">${ATT.map(o=>`<button class="att-b ${o.c} ${cur===o.k?'on':''}" ${edit?'':'disabled'} onclick="setAtt(${ci},'${date}',${s.id},'${o.k}')">${o.t}</button>`).join('')}</div></div>`;
+      <div class="att-btns">${ATT.map(o=>`<button class="att-b ${o.c} ${cur===o.k?'on':''}" ${edit?'':'disabled'} onclick="setAtt(${ci},'${date}',${s.id},'${o.k}')">${o.k==='a'?wAbs(s):(o.k===''?wPres(s):o.t)}</button>`).join('')}</div></div>`;
   }).join('')||'<div class="empty">لا يوجد طلاب في هذا القسم</div>';
 }
 
